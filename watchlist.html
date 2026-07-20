@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSE Tracker - Watchlist</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a1a1a; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 4px; font-size: 1.8rem; color: #0ABAB5; }
+        .subtitle { text-align: center; color: #7fb8b6; margin-bottom: 24px; font-size: 0.9rem; }
+        .nav-links { display: flex; justify-content: center; gap: 10px; margin-bottom: 28px; flex-wrap: wrap; }
+        .nav-link { color: #7fb8b6; font-size: 0.85rem; border: 1px solid #1a3a3a; padding: 5px 14px; border-radius: 20px; transition: all 0.2s; background: none; cursor: pointer; }
+        .nav-link:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .nav-link.active { border-color: #0ABAB5; color: #0ABAB5; background: rgba(10,186,181,0.1); }
+        .card { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+        .card-title { font-size: 1.1rem; font-weight: bold; color: #0ABAB5; }
+        .add-btn { background: rgba(10,186,181,0.15); color: #0ABAB5; border: 1px solid #0ABAB5; padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: bold; }
+        .add-btn:hover { background: #0ABAB5; color: #0a1a1a; }
+        .rows { max-height: 460px; overflow-y: auto; }
+        .rows::-webkit-scrollbar { width: 6px; }
+        .rows::-webkit-scrollbar-track { background: #0a1a1a; border-radius: 3px; }
+        .rows::-webkit-scrollbar-thumb { background: #1a3a3a; border-radius: 3px; }
+        .w-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 12px 14px; background: #0a1a1a; border-radius: 8px; border: 1px solid #163030; margin-bottom: 8px; align-items: center; }
+        .w-row:hover { border-color: #1a4a4a; }
+        .w-left { min-width: 0; }
+        .w-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+        .w-name { font-weight: bold; color: #fff; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+        .w-sym { color: #456a68; font-size: 0.75rem; }
+        .sector-badge { font-size: 0.68rem; background: #163030; color: #8fd4d1; padding: 2px 8px; border-radius: 10px; }
+        .w-meta { font-size: 0.75rem; color: #7fb8b6; }
+        .w-current { text-align: right; }
+        .now-label { color: #456a68; font-size: 0.72rem; }
+        .now-price { font-size: 0.9rem; font-weight: bold; color: #fff; }
+        .change-pct { font-size: 0.8rem; font-weight: bold; }
+        .pl-positive { color: #0ABAB5; }
+        .pl-negative { color: #ff5252; }
+        .pl-zero { color: #7fb8b6; }
+        .w-actions { display: flex; flex-direction: column; gap: 4px; }
+        .w-btn { background: none; border: 1px solid #1a3a3a; border-radius: 6px; color: #7fb8b6; cursor: pointer; padding: 4px 10px; font-size: 0.75rem; }
+        .w-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .w-btn.buy { border-color: #0ABAB5; color: #0ABAB5; }
+        .w-btn.del:hover { border-color: #ff5252; color: #ff5252; }
+        .empty { color: #456a68; text-align: center; padding: 30px 0; font-size: 0.9rem; }
+        .modal-overlay { display: none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 24px; width: 100%; max-width: 400px; }
+        .modal-title { font-size: 1.1rem; font-weight: bold; color: #0ABAB5; margin-bottom: 18px; }
+        .modal-field { margin-bottom: 12px; }
+        .modal-field label { display: block; color: #7fb8b6; font-size: 0.8rem; margin-bottom: 4px; }
+        .modal-field input, .modal-field select { width: 100%; padding: 9px 12px; border: 1px solid #1a3a3a; border-radius: 8px; background: #0a1a1a; color: #e0e0e0; font-size: 0.9rem; }
+        .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+        .modal-btn { padding: 9px 18px; border-radius: 8px; font-size: 0.88rem; cursor: pointer; font-weight: bold; border: none; }
+        .modal-btn.primary { background: #0ABAB5; color: #0a1a1a; }
+        .modal-btn.secondary { background: #1a3a3a; color: #7fb8b6; }
+        .chart-modal { max-width: 560px; }
+        .chart-modal-wrap { position: relative; height: 260px; margin-top: 12px; }
+        .chart-empty { color: #456a68; text-align: center; padding: 40px 0; font-size: 0.85rem; }
+        @media (max-width: 600px) {
+            .w-row { grid-template-columns: 1fr; }
+            .w-actions { flex-direction: row; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Tokyo Stock Exchange</h1>
+    <p class="subtitle">Watchlist</p>
+    <div class="nav-links">
+        <button class="nav-link" onclick="navigate('portfolio')">Portfolio</button>
+        <button class="nav-link" onclick="navigate('growth')">Growth</button>
+        <button class="nav-link" onclick="navigate('history')">History</button>
+        <button class="nav-link active" onclick="navigate('watchlist')">Watchlist</button>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Watching</div>
+            <button class="add-btn" onclick="openAddModal()">+ Add stock</button>
+        </div>
+        <div class="rows" id="watchRows"><div class="empty">Loading...</div></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="addModal">
+    <div class="modal">
+        <div class="modal-title">Add to watchlist</div>
+        <div class="modal-field"><label>Stock code (e.g. 7203)</label><input type="text" id="addSymbol" placeholder="4-digit code"></div>
+        <div class="modal-field"><label>Notice price (JPY)</label><input type="number" id="addPrice" step="0.01" min="0"></div>
+        <div class="modal-field"><label>Notice date</label><input type="date" id="addDate"></div>
+        <div class="modal-buttons">
+            <button class="modal-btn secondary" onclick="closeAddModal()">Cancel</button>
+            <button class="modal-btn primary" onclick="saveWatchItem()">Add</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="buyModal">
+    <div class="modal">
+        <div class="modal-title">Move to portfolio</div>
+        <div class="modal-field"><label>Buy price (JPY)</label><input type="number" id="buyPrice" step="0.01" min="0"></div>
+        <div class="modal-field"><label>Buy date</label><input type="date" id="buyDate"></div>
+        <div class="modal-field"><label>Shares</label>
+            <select id="buyShares">
+                <option value="100">100</option><option value="200">200</option><option value="300">300</option>
+                <option value="400">400</option><option value="500">500</option><option value="1000">1000</option>
+            </select>
+        </div>
+        <div class="modal-buttons">
+            <button class="modal-btn secondary" onclick="closeBuyModal()">Cancel</button>
+            <button class="modal-btn primary" onclick="confirmBuy()">Buy</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="chartModal">
+    <div class="modal chart-modal">
+        <div class="modal-title" id="chartModalTitle">Weekly price history</div>
+        <div class="chart-modal-wrap" id="chartModalWrap" style="display:none;"><canvas id="watchChart"></canvas></div>
+        <div class="chart-empty" id="chartEmpty">No weekly snapshots recorded yet.<br>Set up the weekly trigger in Apps Script to start tracking.</div>
+        <div class="modal-buttons">
+            <button class="modal-btn secondary" onclick="closeChartModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function gasRun(fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function(resolve, reject) {
+        var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+        runner[fnName].apply(runner, args);
+    });
+}
+
+var watchlist = [];
+var buyIndex = -1;
+var watchChart = null;
+var fullHistory = [];
+
+async function init() {
+    try {
+        watchlist = await gasRun('getAllWatchlistFromClient');
+        fullHistory = await gasRun('getWatchlistHistoryFromClient');
+        await renderWatchRows();
+    } catch(e) {
+        document.getElementById('watchRows').innerHTML = '<div class="empty">Could not load: ' + e.message + '</div>';
+    }
+}
+
+async function renderWatchRows() {
+    var el = document.getElementById('watchRows');
+    if (watchlist.length === 0) {
+        el.innerHTML = '<div class="empty">No stocks on your watchlist yet. Click "+ Add stock".</div>';
+        return;
+    }
+    el.innerHTML = '<div class="empty">Loading live prices...</div>';
+
+    var symbols = watchlist.map(function(w) { return w.symbol; });
+    var priceMap = await gasRun('fetchAllPrices', symbols);
+
+    var html = '';
+    watchlist.forEach(function(w, i) {
+        var price = priceMap[w.symbol];
+        var change = null, changeClass = 'pl-zero';
+        if (price != null && w.noticePrice > 0) {
+            change = ((price - w.noticePrice) / w.noticePrice) * 100;
+            changeClass = change > 0 ? 'pl-positive' : change < 0 ? 'pl-negative' : 'pl-zero';
+        }
+        var sectorHtml = w.sector ? '<span class="sector-badge">' + esc(w.sector) + '</span>' : '';
+        html += '<div class="w-row">'
+              + '<div class="w-left">'
+              +   '<div class="w-top"><div class="w-name">' + esc(w.name || w.symbol) + '</div><div class="w-sym">' + esc(w.symbol) + '</div>' + sectorHtml + '</div>'
+              +   '<div class="w-meta">Noticed at \u00A5' + fmt(w.noticePrice) + ' on ' + fmtDate(w.noticeDate) + '</div>'
+              + '</div>'
+              + '<div class="w-current">'
+              +   '<div class="now-label">Now</div>'
+              +   '<div class="now-price">' + (price != null ? '\u00A5' + fmt(price) : '--') + '</div>'
+              +   (change != null ? '<div class="change-pct ' + changeClass + '">' + (change>=0?'+':'') + change.toFixed(1) + '%</div>' : '')
+              + '</div>'
+              + '<div class="w-actions">'
+              +   '<button class="w-btn" data-hist="' + i + '">History</button>'
+              +   '<button class="w-btn buy" data-buy="' + i + '">Buy</button>'
+              +   '<button class="w-btn del" data-del="' + i + '">Remove</button>'
+              + '</div>'
+              + '</div>';
+    });
+    el.innerHTML = html;
+    el.querySelectorAll('[data-hist]').forEach(function(btn) {
+        btn.addEventListener('click', function() { openChartModal(parseInt(btn.getAttribute('data-hist'))); });
+    });
+    el.querySelectorAll('[data-buy]').forEach(function(btn) {
+        btn.addEventListener('click', function() { openBuyModal(parseInt(btn.getAttribute('data-buy'))); });
+    });
+    el.querySelectorAll('[data-del]').forEach(function(btn) {
+        btn.addEventListener('click', function() { removeItem(parseInt(btn.getAttribute('data-del'))); });
+    });
+}
+
+async function openChartModal(index) {
+    var w = watchlist[index];
+    document.getElementById('chartModalTitle').textContent = (w.name || w.symbol) + ' - weekly price';
+    document.getElementById('chartModal').classList.add('active');
+
+    var rows = fullHistory.filter(function(r) { return r.symbol === w.symbol; }).sort(function(a,b) { return a.date < b.date ? -1 : 1; });
+
+    var wrapEl = document.getElementById('chartModalWrap');
+    var emptyEl = document.getElementById('chartEmpty');
+
+    if (rows.length === 0) {
+        wrapEl.style.display = 'none';
+        emptyEl.style.display = 'block';
+        if (watchChart) { watchChart.destroy(); watchChart = null; }
+        return;
+    }
+
+    wrapEl.style.display = 'block';
+    emptyEl.style.display = 'none';
+
+    var labels = rows.map(function(r) { return r.date.slice(5); });
+    var prices = rows.map(function(r) { return r.price; });
+    var noticeLine = rows.map(function() { return w.noticePrice; });
+
+    var isUp = prices[prices.length-1] >= prices[0];
+    var lineColor = isUp ? '#0ABAB5' : '#ff5252';
+    var fillColor = isUp ? 'rgba(10,186,181,0.08)' : 'rgba(255,82,82,0.08)';
+
+    if (watchChart) watchChart.destroy();
+    watchChart = new Chart(document.getElementById('watchChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Price', data: prices, borderColor: lineColor, backgroundColor: fillColor, borderWidth: 2, pointRadius: rows.length<=12?4:0, pointHoverRadius: 6, fill: true, tension: 0.25 },
+                { label: 'Notice price', data: noticeLine, borderColor: 'rgba(240,160,48,0.6)', backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [4,4], pointRadius: 0, fill: false }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0a1a1a', borderColor: '#1a3a3a', borderWidth: 1, titleColor: '#7fb8b6', bodyColor: '#e0e0e0',
+                    callbacks: { label: function(ctx) {
+                        var prefix = ctx.datasetIndex === 0 ? 'Price: ' : 'Notice: ';
+                        return prefix + '\u00A5' + ctx.parsed.y.toLocaleString();
+                    }}
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#456a68', maxTicksLimit: 8, maxRotation: 0 }, grid: { color: '#0e2626' } },
+                y: { ticks: { color: '#456a68', callback: function(v) { return '\u00A5' + v.toLocaleString(); } }, grid: { color: '#0e2626' } }
+            }
+        }
+    });
+}
+
+function closeChartModal() { document.getElementById('chartModal').classList.remove('active'); }
+
+function openAddModal() {
+    document.getElementById('addSymbol').value = '';
+    document.getElementById('addPrice').value = '';
+    document.getElementById('addDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('addModal').classList.add('active');
+}
+function closeAddModal() { document.getElementById('addModal').classList.remove('active'); }
+
+async function saveWatchItem() {
+    var code = document.getElementById('addSymbol').value.trim();
+    var price = parseFloat(document.getElementById('addPrice').value);
+    var date = document.getElementById('addDate').value;
+    if (!/^\d{4}$/.test(code)) { alert('Enter a valid 4-digit stock code.'); return; }
+    if (!price || price <= 0) { alert('Enter a valid notice price.'); return; }
+    var symbol = code + '.T';
+    try {
+        var data = await gasRun('fetchYahooQuote', symbol);
+        var name = data && data.name ? data.name : symbol;
+        watchlist = await gasRun('addWatchlistItemFromClient', { symbol: symbol, name: name, noticePrice: price, noticeDate: date });
+        closeAddModal();
+        await renderWatchRows();
+    } catch(e) { alert('Failed to add: ' + e.message); }
+}
+
+async function removeItem(index) {
+    var w = watchlist[index];
+    if (!confirm('Remove ' + (w.name||w.symbol) + ' from watchlist?')) return;
+    try {
+        watchlist = await gasRun('deleteWatchlistItemFromClient', index);
+        await renderWatchRows();
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+function openBuyModal(index) {
+    buyIndex = index;
+    var w = watchlist[index];
+    document.getElementById('buyPrice').value = w.noticePrice || '';
+    document.getElementById('buyDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('buyModal').classList.add('active');
+}
+function closeBuyModal() { document.getElementById('buyModal').classList.remove('active'); }
+
+async function confirmBuy() {
+    var buyPrice = parseFloat(document.getElementById('buyPrice').value);
+    var buyDate = document.getElementById('buyDate').value;
+    var shares = parseInt(document.getElementById('buyShares').value);
+    if (!buyPrice || buyPrice <= 0) { alert('Enter a valid buy price.'); return; }
+    try {
+        var result = await gasRun('moveToPortfolioFromClient', buyIndex, { buyPrice: buyPrice, buyDate: buyDate, shares: shares });
+        watchlist = result.watchlist;
+        closeBuyModal();
+        await renderWatchRows();
+        alert('Moved to portfolio.');
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+function fmt(n) { if (n==null||isNaN(n)) return 'N/A'; return Number(n).toLocaleString('en-US',{maximumFractionDigits:1}); }
+function esc(s) { var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function fmtDate(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr.indexOf('T')!==-1?dateStr:dateStr+'T00:00:00');
+    if (isNaN(d.getTime())) return String(dateStr);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+
+var _baseUrl = '';
+function initNav() {
+    gasRun('getDeploymentUrl').then(function(url) { _baseUrl = url; }).catch(function() { _baseUrl = ''; });
+}
+function navigate(page) {
+    var url = _baseUrl || window.top.location.href.split('?')[0];
+    window.top.location.href = url + '?page=' + page;
+}
+initNav();
+init();
+</script>
+</body>
+</html>

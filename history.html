@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSE Tracker - Sales History</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a1a1a; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 4px; font-size: 1.8rem; color: #0ABAB5; }
+        .subtitle { text-align: center; color: #7fb8b6; margin-bottom: 24px; font-size: 0.9rem; }
+        .nav-links { display: flex; justify-content: center; gap: 10px; margin-bottom: 28px; }
+        .nav-link { color: #7fb8b6; font-size: 0.85rem; border: 1px solid #1a3a3a; padding: 5px 14px; border-radius: 20px; transition: all 0.2s; background: none; cursor: pointer; }
+        .nav-link:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .nav-link.active { border-color: #0ABAB5; color: #0ABAB5; background: rgba(10,186,181,0.1); }
+        .card { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+        .card-title { font-size: 1.1rem; font-weight: bold; color: #0ABAB5; }
+        .chart-wrap { position: relative; height: 200px; }
+        .chart-hover-info { height: 24px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: #7fb8b6; }
+        .hover-up { font-size: 1rem; font-weight: bold; color: #0ABAB5; }
+        .hover-down { font-size: 1rem; font-weight: bold; color: #ff5252; }
+        .filter-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+        .filter-btn { background: none; border: 1px solid #1a3a3a; border-radius: 16px; color: #7fb8b6; cursor: pointer; padding: 4px 12px; font-size: 0.8rem; transition: all 0.2s; }
+        .filter-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .filter-btn.active { background: #0ABAB5; border-color: #0ABAB5; color: #0a1a1a; font-weight: bold; }
+        .rows { max-height: 420px; overflow-y: auto; }
+        .rows::-webkit-scrollbar { width: 6px; }
+        .rows::-webkit-scrollbar-track { background: #0a1a1a; border-radius: 3px; }
+        .rows::-webkit-scrollbar-thumb { background: #1a3a3a; border-radius: 3px; }
+        .rows::-webkit-scrollbar-thumb:hover { background: #0ABAB5; }
+        .sale-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 12px 14px; background: #0a1a1a; border-radius: 8px; border: 1px solid #163030; margin-bottom: 8px; align-items: center; }
+        .sale-row:hover { border-color: #1a4a4a; }
+        .row-left { min-width: 0; }
+        .row-top { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; }
+        .stock-name { font-weight: bold; color: #fff; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        .stock-sym { color: #456a68; font-size: 0.78rem; }
+        .row-bottom { display: flex; gap: 14px; flex-wrap: wrap; }
+        .meta-pill { font-size: 0.75rem; color: #7fb8b6; }
+        .meta-hl { color: #8fd4d1; }
+        .price-arrow { color: #456a68; margin: 0 2px; }
+        .row-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; min-width: 110px; }
+        .pl-amount { font-weight: bold; font-size: 0.95rem; }
+        .pl-pct-text { font-size: 0.78rem; }
+        .pl-positive { color: #0ABAB5; }
+        .pl-negative { color: #ff5252; }
+        .pl-zero { color: #7fb8b6; }
+        .pl-bar-wrap { width: 90px; height: 4px; background: #163030; border-radius: 2px; margin-top: 3px; }
+        .pl-bar-inner { height: 4px; border-radius: 2px; min-width: 2px; }
+        .bar-pos { background: #0ABAB5; }
+        .bar-neg { background: #ff5252; }
+        .summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #163030; }
+        .sum-label { color: #456a68; font-size: 0.72rem; margin-bottom: 4px; }
+        .sum-value { font-weight: bold; font-size: 0.95rem; color: #fff; margin-bottom: 5px; }
+        .dots { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 2px; min-height: 10px; }
+        .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .dot-win { background: #0ABAB5; }
+        .dot-loss { background: #ff5252; }
+        .fill-bar { height: 4px; background: #163030; border-radius: 2px; overflow: hidden; }
+        .fill-inner { height: 4px; border-radius: 2px; }
+        .stacked-bar { height: 6px; border-radius: 3px; display: flex; overflow: hidden; }
+        .stacked-win { background: #0ABAB5; }
+        .stacked-loss { background: #ff5252; }
+        .empty { color: #456a68; text-align: center; padding: 30px 0; font-size: 0.9rem; }
+        .export-btn { background: none; border: 1px solid #1a3a3a; border-radius: 6px; color: #7fb8b6; cursor: pointer; padding: 5px 12px; font-size: 0.8rem; transition: all 0.2s; }
+        .export-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        @media (max-width: 600px) {
+            .summary { grid-template-columns: repeat(2,1fr); }
+            .sale-row { grid-template-columns: 1fr; }
+            .row-right { align-items: flex-start; flex-direction: row; flex-wrap: wrap; gap: 8px; }
+            .pl-bar-wrap { display: none; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Tokyo Stock Exchange</h1>
+    <p class="subtitle">Sales History</p>
+    <div class="nav-links">
+        <button class="nav-link" onclick="navigate('portfolio')">Portfolio</button>
+        <button class="nav-link" onclick="navigate('growth')">Growth</button>
+        <button class="nav-link active" onclick="navigate('history')">History</button>
+        <button class="nav-link" onclick="navigate('watchlist')">Watchlist</button>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Sales</div>
+            <button class="export-btn" onclick="exportCSV()">Export CSV</button>
+        </div>
+        <div class="filter-row" id="filterRow"></div>
+        <div class="rows" id="saleRows"><div class="empty">Loading...</div></div>
+        <div class="summary" id="summary" style="display:none;"></div>
+    </div>
+
+    <div class="card" id="chartCard" style="display:none;">
+        <div class="card-header">
+            <div class="card-title">Monthly P&amp;L</div>
+            <span style="font-size:0.8rem;color:#456a68;" id="chartYearLabel"></span>
+        </div>
+        <div class="chart-hover-info" id="chartHoverInfo">&nbsp;</div>
+        <div class="chart-wrap"><canvas id="monthlyChart"></canvas></div>
+    </div>
+
+</div>
+<script>
+function gasRun(fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function(resolve, reject) {
+        var runner = google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject);
+        runner[fnName].apply(runner, args);
+    });
+}
+
+var allSales = [];
+var currentFilter = 'all';
+var monthlyChart = null;
+
+async function init() {
+    try {
+        allSales = await gasRun('getAllSales');
+        render();
+        renderMonthlyChart();
+    } catch(e) {
+        document.getElementById('saleRows').innerHTML = '<div class="empty">Could not load: ' + e.message + '</div>';
+    }
+}
+
+function buildFilters() {
+    var years = {};
+    allSales.forEach(function(s) {
+        if (s.sellDate) { var y = s.sellDate.slice(0,4); years[y] = (years[y]||0)+1; }
+    });
+    var html = '<button class="filter-btn' + (currentFilter==='all' ? ' active' : '') + '" data-f="all">All (' + allSales.length + ')</button>';
+    Object.keys(years).sort().reverse().forEach(function(y) {
+        html += '<button class="filter-btn' + (currentFilter===y ? ' active' : '') + '" data-f="' + y + '">' + y + ' (' + years[y] + ')</button>';
+    });
+    var row = document.getElementById('filterRow');
+    row.innerHTML = html;
+    row.querySelectorAll('[data-f]').forEach(function(btn) {
+        btn.addEventListener('click', function() { setFilter(btn.getAttribute('data-f')); });
+    });
+}
+
+function setFilter(val) { currentFilter = val; render(); renderMonthlyChart(); }
+
+function render() {
+    if (allSales.length === 0) {
+        document.getElementById('saleRows').innerHTML = '<div class="empty">No sales yet.</div>';
+        document.getElementById('summary').style.display = 'none';
+        return;
+    }
+    buildFilters();
+    var sales = allSales.filter(function(s) {
+        return currentFilter === 'all' || (s.sellDate && s.sellDate.slice(0,4) === currentFilter);
+    });
+    if (sales.length === 0) {
+        document.getElementById('saleRows').innerHTML = '<div class="empty">No sales in ' + currentFilter + '.</div>';
+        document.getElementById('summary').style.display = 'none';
+        return;
+    }
+    var maxProfit = Math.max.apply(null, sales.map(function(s) { return Math.abs(Number(s.profit)||0); }));
+    var html = '';
+    var totalProfit = 0, totalInvested = 0, wins = 0;
+    sales.slice().reverse().forEach(function(s) {
+        var profit   = Number(s.profit)||0;
+        var invested = Number(s.buyPrice)*Number(s.shares);
+        var plPct    = invested > 0 ? (profit/invested)*100 : 0;
+        var plClass  = profit > 0 ? 'pl-positive' : profit < 0 ? 'pl-negative' : 'pl-zero';
+        var plSign   = profit >= 0 ? '+' : '';
+        var barPct   = maxProfit > 0 ? Math.round((Math.abs(profit)/maxProfit)*100) : 0;
+        var barClass = profit >= 0 ? 'bar-pos' : 'bar-neg';
+        totalProfit  += profit; totalInvested += invested;
+        if (profit > 0) wins++;
+        var buyFmt  = s.buyDate  ? fmtDate(s.buyDate)  : '';
+        var sellFmt = s.sellDate ? fmtDate(s.sellDate) : '';
+        html += '<div class="sale-row">'
+              + '<div class="row-left">'
+              +   '<div class="row-top"><div class="stock-name">' + esc(s.name||s.symbol) + '</div><div class="stock-sym">' + esc(s.symbol) + '</div></div>'
+              +   '<div class="row-bottom">'
+              +     '<div class="meta-pill">' + s.shares + ' shares</div>'
+              +     '<div class="meta-pill"><span class="meta-hl">-' + fmt(s.buyPrice) + '</span><span class="price-arrow">&#8594;</span><span class="meta-hl">-' + fmt(s.sellPrice) + '</span></div>'
+              +     (buyFmt&&sellFmt ? '<div class="meta-pill">' + buyFmt + ' to ' + sellFmt + '</div>' : '')
+              +   '</div>'
+              + '</div>'
+              + '<div class="row-right">'
+              +   '<div class="pl-amount ' + plClass + '">' + plSign + '-' + fmt(Math.abs(profit)) + '</div>'
+              +   '<div class="pl-pct-text ' + plClass + '">(' + plSign + plPct.toFixed(1) + '%)</div>'
+              +   '<div class="pl-bar-wrap"><div class="pl-bar-inner ' + barClass + '" style="width:' + barPct + '%"></div></div>'
+              + '</div>'
+              + '</div>';
+    });
+    document.getElementById('saleRows').innerHTML = html;
+
+    var totalPct   = totalInvested > 0 ? (totalProfit/totalInvested)*100 : 0;
+    var totalClass = totalProfit > 0 ? 'pl-positive' : totalProfit < 0 ? 'pl-negative' : 'pl-zero';
+    var totalSign  = totalProfit >= 0 ? '+' : '';
+    var winRate    = sales.length > 0 ? Math.round((wins/sales.length)*100) : 0;
+    var maxDots = 20;
+    var shown = Math.min(sales.length, maxDots);
+    var winShown = Math.min(wins, shown);
+    var lossShown = shown - winShown;
+    var dotHtml = '';
+    for (var i = 0; i < winShown;  i++) dotHtml += '<div class="dot dot-win"></div>';
+    for (var i = 0; i < lossShown; i++) dotHtml += '<div class="dot dot-loss"></div>';
+    if (sales.length > maxDots) dotHtml += '<span style="font-size:0.7rem;color:#456a68;line-height:7px;">+' + (sales.length-maxDots) + '</span>';
+    var plBarPct  = Math.min(Math.abs(totalPct)/20*100, 100);
+    var plBarCls  = totalProfit >= 0 ? 'bar-pos' : 'bar-neg';
+
+    var summaryEl = document.getElementById('summary');
+    summaryEl.style.display = 'grid';
+    summaryEl.innerHTML =
+        '<div><div class="sum-label">Total Sales</div><div class="sum-value">' + sales.length + '</div><div class="dots">' + dotHtml + '</div></div>'
+      + '<div><div class="sum-label">Realized P&L</div><div class="sum-value ' + totalClass + '">' + totalSign + '-' + fmt(Math.abs(totalProfit)) + '</div><div class="fill-bar"><div class="fill-inner ' + plBarCls + '" style="width:' + plBarPct + '%"></div></div></div>'
+      + '<div><div class="sum-label">Avg return</div><div class="sum-value ' + totalClass + '">' + totalSign + totalPct.toFixed(1) + '%</div><div class="fill-bar"><div class="fill-inner ' + plBarCls + '" style="width:' + plBarPct + '%"></div></div></div>'
+      + '<div><div class="sum-label">Win rate</div><div class="sum-value">' + winRate + '%</div><div class="stacked-bar"><div class="stacked-win" style="flex:' + winRate + '"></div><div class="stacked-loss" style="flex:' + (100-winRate) + '"></div></div></div>';
+}
+
+function renderMonthlyChart() {
+    var sales = allSales.filter(function(s) {
+        return currentFilter === 'all' || (s.sellDate && s.sellDate.slice(0,4) === currentFilter);
+    });
+    var chartCard = document.getElementById('chartCard');
+    if (sales.length === 0) { chartCard.style.display = 'none'; return; }
+    chartCard.style.display = 'block';
+
+    var months, labels;
+    var mNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    if (currentFilter !== 'all') {
+        months = []; labels = [];
+        for (var m = 0; m < 12; m++) {
+            months.push(currentFilter + '-' + ('0'+(m+1)).slice(-2));
+            labels.push(mNames[m]);
+        }
+        document.getElementById('chartYearLabel').textContent = currentFilter;
+    } else {
+        months = []; labels = [];
+        var allDates = sales.map(function(s) { return s.sellDate||''; }).filter(Boolean).sort();
+        var latest = allDates[allDates.length-1];
+        var d = new Date(latest + 'T00:00:00');
+        for (var i = 11; i >= 0; i--) {
+            var dd = new Date(d.getFullYear(), d.getMonth()-i, 1);
+            months.push(dd.getFullYear() + '-' + ('0'+(dd.getMonth()+1)).slice(-2));
+            labels.push(mNames[dd.getMonth()] + ' ' + String(dd.getFullYear()).slice(2));
+        }
+        document.getElementById('chartYearLabel').textContent = 'last 12 months';
+    }
+
+    var profits = months.map(function() { return 0; });
+    sales.forEach(function(s) {
+        if (!s.sellDate) return;
+        var idx = months.indexOf(s.sellDate.slice(0,7));
+        if (idx !== -1) profits[idx] += (Number(s.profit)||0);
+    });
+
+    var bgColors     = profits.map(function(p) { return p >= 0 ? 'rgba(10,186,181,0.7)' : 'rgba(255,82,82,0.7)'; });
+    var hoverColors  = profits.map(function(p) { return p >= 0 ? '#0ABAB5' : '#ff5252'; });
+
+    if (monthlyChart) monthlyChart.destroy();
+    var hoverInfo = document.getElementById('chartHoverInfo');
+
+    monthlyChart = new Chart(document.getElementById('monthlyChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{ data: profits, backgroundColor: bgColors, hoverBackgroundColor: hoverColors, borderRadius: 4, borderSkipped: false }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            onHover: function(event, elements) {
+                if (elements.length > 0) {
+                    var idx = elements[0].index;
+                    var p   = profits[idx];
+                    var sign = p >= 0 ? '+' : '';
+                    var cls  = p >= 0 ? 'hover-up' : 'hover-down';
+                    if (p === 0) { hoverInfo.innerHTML = '<span style="color:#7fb8b6">' + labels[idx] + '</span> <span style="color:#7fb8b6">no sales</span>'; return; }
+                    hoverInfo.innerHTML = '<span style="color:#7fb8b6">' + labels[idx] + '</span> <span class="' + cls + '">' + sign + '-' + fmtAbs(p) + '</span>';
+                } else { hoverInfo.innerHTML = ' '; }
+            },
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: {
+                x: { ticks: { color:'#456a68', maxRotation:0, font:{size:11} }, grid: { color:'#0e2626' } },
+                y: {
+                    ticks: { color:'#456a68', callback: function(v) {
+                        if (Math.abs(v)>=1000000) return (v/1000000).toFixed(1)+'M';
+                        if (Math.abs(v)>=1000) return (v/1000).toFixed(0)+'k';
+                        return v;
+                    }},
+                    grid: { color:'#163030' }
+                }
+            }
+        }
+    });
+    document.getElementById('monthlyChart').addEventListener('mouseleave', function() { hoverInfo.innerHTML = ' '; });
+}
+
+function exportCSV() {
+    if (allSales.length === 0) { alert('No sales to export.'); return; }
+    var rows = ['Symbol,Name,Shares,Buy Price,Sell Price,Buy Date,Sell Date,Profit'];
+    allSales.forEach(function(s) {
+        rows.push([s.symbol, '"'+(s.name||'').replace(/"/g,'""')+'"', s.shares, s.buyPrice, s.sellPrice, s.buyDate, s.sellDate, Number(s.profit).toFixed(0)].join(','));
+    });
+    var nl = String.fromCharCode(10); var blob = new Blob([rows.join(nl)], { type:'text/csv' })
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'tse-sales-history.csv';
+    a.click();
+}
+
+function fmt(n) { if (n==null||isNaN(n)) return 'N/A'; return Number(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+function fmtAbs(n) { return Math.abs(Number(n)).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+function esc(s) { var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function fmtDate(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr.indexOf('T')!==-1 ? dateStr : dateStr+'T00:00:00');
+    if (isNaN(d.getTime())) return String(dateStr);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
+}
+
+var _baseUrl = '';
+function initNav() {
+    gasRun('getDeploymentUrl').then(function(url) { _baseUrl = url; }).catch(function() { _baseUrl = ''; });
+}
+function navigate(page) {
+    var url = _baseUrl || window.top.location.href.split('?')[0];
+    window.top.location.href = url + '?page=' + page;
+}
+initNav();
+init();
+</script>
+</body>
+</html>

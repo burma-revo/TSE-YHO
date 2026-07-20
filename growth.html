@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSE Tracker - Portfolio Growth</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js">
+var _baseUrl = '';
+function initNav() {
+    gasRun('getDeploymentUrl').then(function(url) {
+        _baseUrl = url;
+    }).catch(function() {
+        _baseUrl = '';
+    });
+}
+function navigate(page) {
+    var url = _baseUrl || window.top.location.href.split('?')[0];
+    window.top.location.href = url + '?page=' + page;
+}
+
+initNav();
+
+var _baseUrl = '';
+function initNav() {
+    gasRun('getDeploymentUrl').then(function(url) {
+        _baseUrl = url;
+    }).catch(function() {
+        _baseUrl = '';
+    });
+}
+function navigate(page) {
+    var url = _baseUrl || window.top.location.href.split('?')[0];
+    window.top.location.href = url + '?page=' + page;
+}
+
+initNav();
+init();
+</script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a1a1a; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 4px; font-size: 1.8rem; color: #0ABAB5; }
+        .subtitle { text-align: center; color: #7fb8b6; margin-bottom: 24px; font-size: 0.9rem; }
+        .nav-links { display: flex; justify-content: center; gap: 10px; margin-bottom: 28px; }
+        .nav-link { color: #7fb8b6; font-size: 0.85rem; text-decoration: none; border: 1px solid #1a3a3a; padding: 5px 14px; border-radius: 20px; transition: all 0.2s; }
+        .nav-link:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .nav-link.active { border-color: #0ABAB5; color: #0ABAB5; background: rgba(10,186,181,0.1); }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-item { background: #0e2626; padding: 14px; border-radius: 8px; border: 1px solid #163030; }
+        .stat-label { color: #456a68; font-size: 0.75rem; margin-bottom: 4px; }
+        .stat-value { font-size: 1.1rem; font-weight: bold; color: #fff; }
+        .card { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+        .card-title { font-size: 1rem; font-weight: bold; color: #8fd4d1; }
+        .range-btns { display: flex; gap: 6px; }
+        .range-btn { background: none; border: 1px solid #1a3a3a; border-radius: 6px; color: #7fb8b6; cursor: pointer; padding: 4px 12px; font-size: 0.8rem; transition: all 0.2s; }
+        .range-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .range-btn.active { background: #0ABAB5; border-color: #0ABAB5; color: #0a1a1a; font-weight: bold; }
+        .chart-wrap { position: relative; height: 320px; }
+        .empty { color: #456a68; text-align: center; padding: 40px 0; font-size: 0.9rem; line-height: 1.7; }
+        .record-btn { background: rgba(10,186,181,0.15); color: #0ABAB5; border: 1px solid #0ABAB5; padding: 7px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+        .record-btn:hover { background: #0ABAB5; color: #0a1a1a; }
+        .record-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .history-scroll { max-height: 300px; overflow-y: auto; }
+        .history-scroll::-webkit-scrollbar { width: 4px; }
+        .history-scroll::-webkit-scrollbar-track { background: #0a1a1a; }
+        .history-scroll::-webkit-scrollbar-thumb { background: #1a3a3a; border-radius: 2px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { color: #456a68; font-weight: normal; padding: 8px 10px; border-bottom: 1px solid #163030; text-align: right; }
+        th:first-child { text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #0e2020; text-align: right; color: #e0e0e0; }
+        td:first-child { text-align: left; color: #7fb8b6; }
+        tr:last-child td { border-bottom: none; }
+        .pl-positive { color: #0ABAB5; }
+        .pl-negative { color: #ff5252; }
+        .count-label { font-size: 0.8rem; color: #456a68; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Tokyo Stock Exchange</h1>
+    <p class="subtitle">Portfolio Growth</p>
+    <div class="nav-links">
+        <button class="nav-link" onclick="navigate('portfolio')">Portfolio</button>
+        <button class="nav-link active" onclick="navigate('growth')">Growth</button>
+        <button class="nav-link" onclick="navigate('history')">History</button>
+        <button class="nav-link" onclick="navigate('watchlist')">Watchlist</button>
+    </div>
+
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-item"><div class="stat-label">Current Value</div><div class="stat-value" id="statValue">--</div></div>
+        <div class="stat-item"><div class="stat-label">Total Invested</div><div class="stat-value" id="statInvested">--</div></div>
+        <div class="stat-item"><div class="stat-label">Unrealized P&amp;L</div><div class="stat-value" id="statPL">--</div></div>
+        <div class="stat-item"><div class="stat-label">All-time High</div><div class="stat-value" style="color:#f0a030" id="statATH">--</div></div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Value over time</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <div class="range-btns">
+                    <button class="range-btn active" id="rng1m" onclick="setRange(30)">1M</button>
+                    <button class="range-btn" id="rng3m" onclick="setRange(90)">3M</button>
+                    <button class="range-btn" id="rng6m" onclick="setRange(180)">6M</button>
+                    <button class="range-btn" id="rngAll" onclick="setRange(0)">All</button>
+                </div>
+                <button class="record-btn" id="recordBtn" onclick="recordSnapshot()">+ Record today</button>
+            </div>
+        </div>
+        <div class="chart-wrap" id="chartWrap" style="display:none;">
+            <canvas id="growthChart"></canvas>
+        </div>
+        <div class="empty" id="emptyMsg">
+            No snapshots yet.<br>
+            Click '+ Record today' to save your first snapshot,<br>
+            then set up a daily trigger in Apps Script to auto-record each afternoon.
+        </div>
+    </div>
+
+    <div class="card" id="historyCard" style="display:none;">
+        <div class="card-header">
+            <div class="card-title">Snapshot history</div>
+            <span class="count-label" id="historyCount"></span>
+        </div>
+        <div class="history-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Value</th>
+                        <th>Invested</th>
+                        <th>P&amp;L</th>
+                        <th>%</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script>
+function gasRun(fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function(resolve, reject) {
+        var runner = google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject);
+        runner[fnName].apply(runner, args);
+    });
+}
+
+var allSnapshots = [];
+var growthChart = null;
+var currentRange = 30;
+
+async function init() {
+    try {
+        allSnapshots = await gasRun('getSnapshotsFromClient');
+        renderChart(currentRange);
+    } catch(e) {
+        document.getElementById('emptyMsg').textContent = 'Could not load snapshots: ' + e.message;
+    }
+}
+
+function setRange(days) {
+    currentRange = days;
+    var ids = { 30:'rng1m', 90:'rng3m', 180:'rng6m', 0:'rngAll' };
+    document.querySelectorAll('.range-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById(ids[days]).classList.add('active');
+    renderChart(days);
+}
+
+function renderChart(days) {
+    var data = allSnapshots.slice();
+    if (days > 0 && data.length > 0) {
+        var cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - days);
+        var cutStr = fmtDate(cutoff);
+        data = data.filter(function(r) { return r.date >= cutStr; });
+    }
+
+    var emptyEl = document.getElementById('emptyMsg');
+    var wrapEl  = document.getElementById('chartWrap');
+
+    if (allSnapshots.length > 0) {
+        var last    = allSnapshots[allSnapshots.length - 1];
+        var ath     = Math.max.apply(null, allSnapshots.map(function(r) { return r.value; }));
+        var pl      = last.value - last.invested;
+        var plPct   = last.invested > 0 ? (pl / last.invested) * 100 : 0;
+        var plClass = pl >= 0 ? 'pl-positive' : 'pl-negative';
+        var plSign  = pl >= 0 ? '+' : '';
+        document.getElementById('statValue').textContent    = '\u00A5' + fmt(last.value);
+        document.getElementById('statInvested').textContent = '\u00A5' + fmt(last.invested);
+        document.getElementById('statATH').textContent      = '\u00A5' + fmt(ath);
+        document.getElementById('statPL').textContent       = plSign + '\u00A5' + fmt(Math.abs(pl)) + ' (' + plSign + plPct.toFixed(1) + '%)';
+        document.getElementById('statPL').className         = 'stat-value ' + plClass;
+    }
+
+    if (data.length === 0) {
+        emptyEl.style.display = 'block';
+        wrapEl.style.display  = 'none';
+        if (growthChart) { growthChart.destroy(); growthChart = null; }
+        renderTable([]);
+        return;
+    }
+
+    emptyEl.style.display = 'none';
+    wrapEl.style.display  = 'block';
+
+    var labels    = data.map(function(r) { return r.date.slice(5); });
+    var values    = data.map(function(r) { return r.value; });
+    var investeds = data.map(function(r) { return r.invested; });
+    var isUp      = values[values.length - 1] >= values[0];
+    var lineColor = isUp ? '#0ABAB5' : '#ff5252';
+    var fillColor = isUp ? 'rgba(10,186,181,0.08)' : 'rgba(255,82,82,0.08)';
+
+    if (growthChart) growthChart.destroy();
+
+    growthChart = new Chart(document.getElementById('growthChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Portfolio Value',
+                    data: values,
+                    borderColor: lineColor,
+                    backgroundColor: fillColor,
+                    borderWidth: 2,
+                    pointRadius: data.length <= 14 ? 4 : 0,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: lineColor,
+                    fill: true,
+                    tension: 0.3,
+                    order: 1
+                },
+                {
+                    label: 'Cost Basis',
+                    data: investeds,
+                    borderColor: 'rgba(127,184,182,0.5)',
+                    backgroundColor: 'transparent',
+                    borderWidth: 1.5,
+                    borderDash: [4, 4],
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    fill: false,
+                    tension: 0.3,
+                    order: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0a1a1a',
+                    borderColor: '#1a3a3a',
+                    borderWidth: 1,
+                    titleColor: '#7fb8b6',
+                    bodyColor: '#e0e0e0',
+                    callbacks: {
+                        label: function(ctx) {
+                            var prefix = ctx.datasetIndex === 0 ? 'Value: ' : 'Cost:  ';
+                            return prefix + '\u00A5' + ctx.parsed.y.toLocaleString();
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color:'#456a68', maxTicksLimit:8, maxRotation:0 }, grid: { color:'#0e2626' } },
+                y: {
+                    ticks: {
+                        color: '#456a68',
+                        callback: function(v) { return '\u00A5' + (v / 1000).toFixed(0) + 'k'; }
+                    },
+                    grid: { color: '#0e2626' }
+                }
+            }
+        }
+    });
+
+    renderTable(allSnapshots);
+}
+
+function renderTable(snapshots) {
+    var card    = document.getElementById('historyCard');
+    var body    = document.getElementById('historyBody');
+    var countEl = document.getElementById('historyCount');
+    if (!snapshots || snapshots.length === 0) { card.style.display = 'none'; return; }
+    card.style.display  = 'block';
+    countEl.textContent = snapshots.length + ' records';
+    var rows = snapshots.slice().reverse();
+    var html = '';
+    rows.forEach(function(r) {
+        var pl    = r.value - r.invested;
+        var plPct = r.invested > 0 ? (pl / r.invested) * 100 : 0;
+        var cls   = pl >= 0 ? 'pl-positive' : 'pl-negative';
+        var sign  = pl >= 0 ? '+' : '';
+        html += '<tr>'
+              + '<td>' + r.date + '</td>'
+              + '<td>\u00A5' + fmt(r.value) + '</td>'
+              + '<td>\u00A5' + fmt(r.invested) + '</td>'
+              + '<td class="' + cls + '">' + sign + '\u00A5' + fmt(Math.abs(pl)) + '</td>'
+              + '<td class="' + cls + '">' + sign + plPct.toFixed(1) + '%</td>'
+              + '</tr>';
+    });
+    body.innerHTML = html;
+}
+
+async function recordSnapshot() {
+    var btn = document.getElementById('recordBtn');
+    btn.textContent = 'Saving...';
+    btn.disabled = true;
+    try {
+        allSnapshots = await gasRun('recordSnapshotFromClient');
+        renderChart(currentRange);
+        btn.textContent = 'Saved!';
+        setTimeout(function() { btn.textContent = '+ Record today'; btn.disabled = false; }, 2000);
+    } catch(e) {
+        alert('Failed: ' + e.message);
+        btn.textContent = '+ Record today';
+        btn.disabled = false;
+    }
+}
+
+function fmt(n) {
+    if (n == null || isNaN(n)) return 'N/A';
+    return Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function fmtDate(d) {
+    var y  = d.getFullYear();
+    var m  = ('0' + (d.getMonth() + 1)).slice(-2);
+    var dd = ('0' + d.getDate()).slice(-2);
+    return y + '-' + m + '-' + dd;
+}
+
+
+var _baseUrl = '';
+function initNav() {
+    gasRun('getDeploymentUrl').then(function(url) {
+        _baseUrl = url;
+    }).catch(function() {
+        _baseUrl = '';
+    });
+}
+function navigate(page) {
+    var url = _baseUrl || window.top.location.href.split('?')[0];
+    window.top.location.href = url + '?page=' + page;
+}
+
+initNav();
+init();
+</script>
+</body>
+</html>

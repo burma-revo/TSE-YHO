@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tokyo Stock Exchange - Stock Search & Portfolio Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a1a1a; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 8px; font-size: 1.8rem; color: #0ABAB5; }
+        .subtitle { text-align: center; color: #7fb8b6; margin-bottom: 30px; font-size: 0.9rem; }
+        .nav-links { display: flex; justify-content: center; gap: 10px; margin-bottom: 28px; }
+        .nav-link { color: #7fb8b6; font-size: 0.85rem; text-decoration: none; border: 1px solid #1a3a3a; padding: 5px 14px; border-radius: 20px; transition: all 0.2s; }
+        .nav-link:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .nav-link.active { border-color: #0ABAB5; color: #0ABAB5; background: rgba(10,186,181,0.1); }
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
+        .search-box input { flex: 1; padding: 12px 16px; border: 1px solid #1a3a3a; border-radius: 8px; background: #0e2626; color: #e0e0e0; font-size: 1rem; outline: none; }
+        .search-box input:focus { border-color: #0ABAB5; }
+        .search-box button { padding: 12px 24px; background: #0ABAB5; color: #0a1a1a; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: bold; }
+        .search-box button:hover { background: #08a8a3; }
+        .quick-picks { margin-bottom: 24px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .quick-picks span { color: #7fb8b6; font-size: 0.85rem; line-height: 32px; }
+        .chip { padding: 4px 14px; background: #0e2626; border: 1px solid #1a3a3a; border-radius: 20px; font-size: 0.85rem; cursor: pointer; color: #8fd4d1; transition: all 0.2s; }
+        .chip:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .loading { text-align: center; padding: 40px; color: #7fb8b6; display: none; }
+        .spinner { border: 3px solid #1a3a3a; border-top: 3px solid #0ABAB5; border-radius: 50%; width: 32px; height: 32px; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error { background: #1a2a2a; border: 1px solid #2a4a4a; padding: 16px; border-radius: 8px; color: #e07a7a; display: none; margin-bottom: 16px; }
+        .stock-card { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 24px; display: none; }
+        .stock-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .stock-name { font-size: 1.4rem; font-weight: bold; color: #fff; }
+        .stock-symbol { color: #7fb8b6; font-size: 0.9rem; margin-top: 2px; }
+        .stock-exchange { background: rgba(10,186,181,0.15); color: #0ABAB5; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; }
+        .price-section { display: flex; align-items: baseline; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+        .current-price { font-size: 2.4rem; font-weight: bold; color: #fff; }
+        .price-change { font-size: 1.1rem; font-weight: bold; padding: 4px 10px; border-radius: 6px; }
+        .price-change.up { background: #0d3b2e; color: #0ABAB5; }
+        .price-change.down { background: #3b1a1a; color: #ff5252; }
+        .price-change.flat { background: #2a2a1a; color: #ffeb3b; }
+        .currency { color: #7fb8b6; font-size: 1rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-item { background: #0a1a1a; padding: 14px; border-radius: 8px; border: 1px solid #163030; }
+        .stat-label { color: #7fb8b6; font-size: 0.8rem; margin-bottom: 4px; }
+        .stat-value { font-size: 1.1rem; font-weight: bold; color: #fff; }
+        .stat-value.green { color: #0ABAB5; }
+        .stat-value.red { color: #ff5252; }
+        .timestamp { color: #456a68; font-size: 0.8rem; text-align: right; margin-top: 12px; }
+        .chart-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid #163030; }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 8px; }
+        .chart-title { font-size: 1rem; font-weight: bold; color: #8fd4d1; }
+        .range-buttons { display: flex; gap: 6px; }
+        .range-btn { padding: 4px 12px; background: #0a1a1a; border: 1px solid #1a3a3a; border-radius: 6px; color: #7fb8b6; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+        .range-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .range-btn.active { background: #0ABAB5; border-color: #0ABAB5; color: #0a1a1a; font-weight: bold; }
+        .chart-hover-info { height: 28px; margin-bottom: 6px; display: flex; align-items: center; gap: 12px; font-size: 0.85rem; color: #7fb8b6; }
+        .chart-hover-info .hover-price { font-size: 1.1rem; font-weight: bold; color: #fff; }
+        .chart-hover-info .hover-change { font-weight: bold; font-size: 0.85rem; }
+        .chart-hover-info .hover-change.up { color: #0ABAB5; }
+        .chart-hover-info .hover-change.down { color: #ff5252; }
+        .chart-container { position: relative; height: 300px; }
+        .chart-loading { text-align: center; color: #456a68; padding: 40px 0; font-size: 0.9rem; }
+        .multi-results { display: none; margin-bottom: 16px; }
+        .result-item { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 8px; padding: 14px 18px; margin-bottom: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: border-color 0.2s; }
+        .result-item:hover { border-color: #0ABAB5; }
+        .result-item .name { font-weight: bold; color: #fff; }
+        .result-item .symbol { color: #7fb8b6; font-size: 0.85rem; }
+        .result-item .type-badge { font-size: 0.75rem; background: #1a3a3a; padding: 2px 8px; border-radius: 4px; color: #8fd4d1; }
+        .portfolio-section { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+        .portfolio-rows { max-height: 320px; overflow-y: auto; }
+        .portfolio-rows::-webkit-scrollbar { width: 6px; }
+        .portfolio-rows::-webkit-scrollbar-track { background: #0a1a1a; border-radius: 3px; }
+        .portfolio-rows::-webkit-scrollbar-thumb { background: #1a3a3a; border-radius: 3px; }
+        .portfolio-rows::-webkit-scrollbar-thumb:hover { background: #0ABAB5; }
+        .portfolio-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+        .portfolio-title { font-size: 1.1rem; font-weight: bold; color: #0ABAB5; }
+        .portfolio-total-pl { font-size: 0.95rem; font-weight: bold; }
+        .portfolio-empty { color: #456a68; text-align: center; padding: 20px 0; font-size: 0.9rem; }
+        .portfolio-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 12px; align-items: center; padding: 12px; border-radius: 8px; background: #0a1a1a; margin-bottom: 8px; border: 1px solid #163030; }
+        .portfolio-row:hover { border-color: #1a4a4a; }
+        .portfolio-stock-info { min-width: 0; }
+        .portfolio-stock-name { font-weight: bold; color: #fff; cursor: pointer; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .portfolio-stock-name:hover { color: #0ABAB5; }
+        .portfolio-stock-detail { color: #7fb8b6; font-size: 0.8rem; margin-top: 2px; }
+        .portfolio-position { text-align: right; font-size: 0.85rem; color: #8fd4d1; white-space: nowrap; }
+        .portfolio-current { text-align: right; font-size: 0.85rem; color: #fff; white-space: nowrap; }
+        .portfolio-current .current-label { color: #456a68; font-size: 0.75rem; }
+        .portfolio-pl { text-align: right; white-space: nowrap; }
+        .portfolio-pl .pl-value { font-weight: bold; font-size: 0.95rem; }
+        .portfolio-pl .pl-pct { font-size: 0.8rem; }
+        .pl-positive { color: #0ABAB5; }
+        .pl-negative { color: #ff5252; }
+        .pl-zero { color: #7fb8b6; }
+        .portfolio-actions { display: flex; gap: 6px; }
+        .portfolio-btn { background: none; border: 1px solid #1a3a3a; border-radius: 6px; color: #7fb8b6; cursor: pointer; padding: 4px 8px; font-size: 0.8rem; transition: all 0.2s; }
+        .portfolio-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .portfolio-btn.delete:hover { border-color: #ff5252; color: #ff5252; }
+        .portfolio-btn.sell { border-color: #f0a030; color: #f0a030; }
+        .portfolio-btn.sell:hover { border-color: #ffb347; color: #ffb347; }
+        .portfolio-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #163030; }
+        .summary-item { text-align: center; }
+        .summary-label { color: #456a68; font-size: 0.75rem; margin-bottom: 2px; }
+        .summary-value { font-weight: bold; font-size: 0.95rem; color: #fff; }
+        #allocationChart { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid #163030; }
+        .treemap-grid { display: flex; flex-wrap: wrap; gap: 2px; border-radius: 6px; overflow: hidden; }
+        .treemap-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 60px; min-height: 60px; padding: 6px 4px; cursor: default; transition: filter 0.15s; overflow: hidden; }
+        .treemap-cell:hover { filter: brightness(1.2); }
+        .treemap-name { font-size: 0.72rem; font-weight: 600; color: #fff; text-align: center; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+        .treemap-pct { font-size: 0.85rem; font-weight: 700; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+        .treemap-val { font-size: 0.6rem; color: rgba(255,255,255,0.75); text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+        .add-portfolio-btn { background: rgba(10,186,181,0.15); color: #0ABAB5; border: 1px solid #0ABAB5; padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+        .add-portfolio-btn:hover { background: #0ABAB5; color: #0a1a1a; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 24px; width: 100%; max-width: 420px; }
+        .modal-title { font-size: 1.1rem; font-weight: bold; color: #0ABAB5; margin-bottom: 20px; }
+        .modal-field { margin-bottom: 14px; }
+        .modal-field label { display: block; color: #7fb8b6; font-size: 0.8rem; margin-bottom: 4px; }
+        .modal-field input, .modal-field textarea, .modal-field select { width: 100%; padding: 10px 12px; border: 1px solid #1a3a3a; border-radius: 8px; background: #0a1a1a; color: #e0e0e0; font-size: 0.95rem; outline: none; font-family: inherit; }
+        .modal-field input:focus, .modal-field textarea:focus, .modal-field select:focus { border-color: #0ABAB5; }
+        .modal-field textarea { resize: vertical; min-height: 60px; }
+        .modal-field select { appearance: none; cursor: pointer; }
+        .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+        .modal-btn { padding: 10px 20px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; font-weight: bold; border: none; }
+        .modal-btn.primary { background: #0ABAB5; color: #0a1a1a; }
+        .modal-btn.primary:hover { background: #08a8a3; }
+        .modal-btn.secondary { background: #1a3a3a; color: #7fb8b6; }
+        .modal-btn.secondary:hover { background: #1e4444; }
+        @media (max-width: 600px) {
+            .portfolio-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .portfolio-position, .portfolio-current, .portfolio-pl { text-align: left; }
+            .portfolio-summary { grid-template-columns: 1fr; gap: 8px; }
+            .summary-item { text-align: left; }
+        }
+
+/* -- Pages -- */
+        .page { display: none; }
+        .page.active { display: block; }
+
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Tokyo Stock Exchange</h1>
+    <p class="subtitle">Search stocks &amp; track your portfolio</p>
+    <div class="nav-links">
+        <button class="nav-link active" onclick="navigate('portfolio')">Portfolio</button>
+        <button class="nav-link" onclick="navigate('growth')">Growth</button>
+        <button class="nav-link" onclick="navigate('history')">History</button>
+        <button class="nav-link" onclick="navigate('watchlist')">Watchlist</button>
+    </div>
+
+    <!-- Navigation -->
+    
+
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Enter stock code (e.g. 7203) or company name (e.g. Toyota)" autocomplete="off">
+        <button onclick="search()">Search</button>
+    </div>
+
+    <div class="quick-picks">
+        <span>Popular:</span>
+        <div class="chip" onclick="quickSearch('7203')">7203 Toyota</div>
+        <div class="chip" onclick="quickSearch('6758')">6758 Sony</div>
+        <div class="chip" onclick="quickSearch('6861')">6861 Keyence</div>
+        <div class="chip" onclick="quickSearch('9984')">9984 SoftBank</div>
+        <div class="chip" onclick="quickSearch('6501')">6501 Hitachi</div>
+        <div class="chip" onclick="quickSearch('8306')">8306 MUFG</div>
+        <div class="chip" onclick="quickSearch('7974')">7974 Nintendo</div>
+        <div class="chip" onclick="quickSearch('9432')">9432 NTT</div>
+    </div>
+
+    <div class="portfolio-section" id="portfolioSection">
+        <div class="portfolio-header">
+            <div class="portfolio-title">My Portfolio</div>
+            <div class="portfolio-total-pl" id="portfolioTotalPl"></div>
+        </div>
+        <div id="portfolioRows" class="portfolio-rows"></div>
+        <div id="allocationChart" style="display:none;">
+            <div class="treemap-grid" id="treemapGrid"></div>
+        </div>
+        <div class="portfolio-summary" id="portfolioSummary" style="display:none;"></div>
+    </div>
+
+    <div class="error" id="error"></div>
+    <div class="loading" id="loading"><div class="spinner"></div>Fetching stock data...</div>
+    <div class="multi-results" id="multiResults"></div>
+    <div class="stock-card" id="stockCard"></div>
+
+
+    
+
+</div>
+
+<!-- Add / Edit Modal -->
+<div class="modal-overlay" id="portfolioModal">
+    <div class="modal">
+        <div class="modal-title" id="modalTitle">Add to Portfolio</div>
+        <div class="modal-field">
+            <label>Stock</label>
+            <input type="text" id="modalStock" readonly style="color:#7fb8b6;">
+        </div>
+        <div class="modal-field">
+            <label>Buy Price (JPY)</label>
+            <input type="number" id="modalBuyPrice" step="0.01" min="0">
+        </div>
+        <div class="modal-field">
+            <label>Buy Date</label>
+            <input type="date" id="modalBuyDate">
+        </div>
+        <div class="modal-field">
+            <label>Number of Shares</label>
+            <select id="modalShares">
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="300">300</option>
+                <option value="400">400</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+            </select>
+        </div>
+        <div class="modal-field">
+            <label>Notes (optional)</label>
+            <textarea id="modalNotes" placeholder="e.g. long term hold"></textarea>
+        </div>
+        <div class="modal-buttons">
+            <button class="modal-btn secondary" onclick="closeModal()">Cancel</button>
+            <button class="modal-btn primary" id="modalSaveBtn" onclick="saveModalPosition()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Sell Modal -->
+<div class="modal-overlay" id="sellModal">
+    <div class="modal">
+        <div class="modal-title" style="color:#f0a030;">Sell Position</div>
+        <div class="modal-field">
+            <label>Stock</label>
+            <input type="text" id="sellModalStock" readonly style="color:#7fb8b6;">
+        </div>
+        <div class="modal-field">
+            <label>Buy Price (JPY)</label>
+            <input type="text" id="sellModalBuyPrice" readonly style="color:#7fb8b6;">
+        </div>
+        <div class="modal-field">
+            <label id="sellModalSharesLabel">Shares to Sell</label>
+            <select id="sellModalShares"></select>
+        </div>
+        <div class="modal-field">
+            <label>Sell Price (JPY)</label>
+            <input type="number" id="sellModalPrice" step="0.01" min="0">
+        </div>
+        <div class="modal-field">
+            <label>Sell Date</label>
+            <input type="date" id="sellModalDate">
+        </div>
+        <div style="background:#0a1a1a;border-radius:8px;padding:12px;margin-top:8px;">
+            <div style="color:#7fb8b6;font-size:0.8rem;margin-bottom:4px;">Estimated Profit</div>
+            <div id="sellModalProfit" style="font-size:1.1rem;font-weight:bold;color:#fff;">--</div>
+        </div>
+        <div class="modal-buttons">
+            <button class="modal-btn secondary" onclick="closeSellModal()">Cancel</button>
+            <button class="modal-btn primary" style="background:#f0a030;" onclick="confirmSell()">Sell</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// GAS bridge
+function gasRun(fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function(resolve, reject) {
+        var runner = google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject);
+        runner[fnName].apply(runner, args);
+    });
+}
+async function fetchYahoo(url) {
+    var raw = await gasRun('proxyYahoo', url);
+    if (typeof raw === 'string') return JSON.parse(raw);
+    return raw;
+}
+async function gasListPositions()           { return gasRun('getAllPositions'); }
+async function gasAddPosition(pos)          { return gasRun('addPositionFromClient', pos); }
+async function gasEditPosition(index, pos)  { return gasRun('editPositionFromClient', index, pos); }
+async function gasDeletePosition(index)     { return gasRun('deletePositionFromClient', index); }
+async function gasSellPosition(index, data) { return gasRun('sellPositionFromClient', index, data); }
+async function gasGetSales()                { return gasRun('getAllSales'); }
+
+// Search
+document.getElementById('searchInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') search();
+});
+function quickSearch(code) {
+    document.getElementById('searchInput').value = code;
+    search();
+}
+async function search() {
+    var query = document.getElementById('searchInput').value.trim();
+    if (!query) return;
+    hideAll();
+    show('loading');
+    if (/^\d{4}$/.test(query)) {
+        await fetchStock(query + '.T');
+    } else {
+        await searchByName(query);
+    }
+}
+async function searchByName(query) {
+    try {
+        var data = await fetchYahoo(
+            'https://query2.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(query) + '&quotesCount=10&newsCount=0&region=JP&lang=en-US'
+        );
+        var quotes = (data.quotes || []).filter(function(q) {
+            return q.symbol && q.symbol.endsWith('.T') && q.quoteType === 'EQUITY';
+        });
+        hide('loading');
+        if (quotes.length === 0) {
+            showError('No TSE stocks found for: ' + query + '. Try a 4-digit stock code.');
+        } else if (quotes.length === 1) {
+            show('loading');
+            await fetchStock(quotes[0].symbol);
+        } else {
+            var html = '<p class="results-label">Found ' + quotes.length + ' results:</p>';
+            quotes.forEach(function(q) {
+                html += '<div class="result-item" data-sym="' + q.symbol + '">'
+                      + '<div><div class="name">' + esc(q.shortname || q.longname || q.symbol) + '</div>'
+                      + '<div class="symbol">' + q.symbol + '</div></div>'
+                      + '<div class="type-badge">' + (q.exchange || 'TSE') + '</div></div>';
+            });
+            var container = document.getElementById('multiResults');
+            container.innerHTML = html;
+            container.querySelectorAll('[data-sym]').forEach(function(el) {
+                el.addEventListener('click', function() { selectResult(el.dataset.sym); });
+            });
+            show('multiResults');
+        }
+    } catch (err) {
+        hide('loading');
+        showError('Search error: ' + err.message);
+    }
+}
+async function selectResult(symbol) {
+    hideAll();
+    show('loading');
+    await fetchStock(symbol);
+}
+
+async function fetchStock(symbol) {
+    try {
+        var data = await fetchYahoo(
+            'https://query1.finance.yahoo.com/v8/finance/chart/' + symbol + '?interval=1d&range=1d'
+        );
+        var result = data.chart && data.chart.result && data.chart.result[0];
+        if (!result) throw new Error('No data returned');
+        var meta = result.meta;
+        if (!meta.regularMarketPrice) throw new Error('No market data available');
+
+        var close     = meta.regularMarketPrice;
+        var high      = meta.regularMarketDayHigh;
+        var low       = meta.regularMarketDayLow;
+        var volume    = meta.regularMarketVolume;
+        var prevClose = meta.chartPreviousClose;
+
+        var quotes2 = result.indicators && result.indicators.quote && result.indicators.quote[0];
+        var open = null;
+        if (quotes2 && quotes2.open) {
+            for (var i = quotes2.open.length - 1; i >= 0; i--) {
+                var val = quotes2.open[i];
+                if (val != null && val > 0 && Math.abs(val - close) / close < 0.5) { open = val; break; }
+            }
+        }
+        if (open == null) open = prevClose;
+
+        var w52High = (meta.fiftyTwoWeekHigh && meta.fiftyTwoWeekHigh < close * 10) ? meta.fiftyTwoWeekHigh : null;
+        var w52Low  = (meta.fiftyTwoWeekLow  && meta.fiftyTwoWeekLow  > 0 && meta.fiftyTwoWeekLow < close * 10) ? meta.fiftyTwoWeekLow : null;
+
+        var change    = prevClose != null ? close - prevClose : 0;
+        var changePct = prevClose != null ? (change / prevClose) * 100 : 0;
+        var direction = change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
+        var arrow     = change > 0 ? '+' : '';
+
+        var marketTime = meta.regularMarketTime;
+        var dateStr = marketTime
+            ? new Date(marketTime * 1000).toLocaleDateString('en-JP', {
+                year:'numeric', month:'short', day:'numeric',
+                hour:'2-digit', minute:'2-digit', timeZone:'Asia/Tokyo'
+              })
+            : 'N/A';
+
+        var name     = meta.longName || meta.shortName || meta.symbol;
+        var currency = meta.currency || 'JPY';
+
+        window._lastSymbol = meta.symbol;
+        window._lastName   = name;
+        window._lastClose  = close;
+
+        document.getElementById('stockCard').innerHTML =
+            '<div class="stock-header">'
+          +   '<div>'
+          +     '<div class="stock-name">' + esc(name) + '</div>'
+          +     '<div class="stock-symbol">' + esc(meta.symbol) + '  -  ' + esc(meta.exchangeName || 'Tokyo') + '</div>'
+          +   '</div>'
+          +   '<div style="display:flex;gap:8px;align-items:center;">'
+          +     '<button class="add-portfolio-btn" id="addPortfolioBtn">+ Portfolio</button>'
+          +     '<div class="stock-exchange">TSE</div>'
+          +   '</div>'
+          + '</div>'
+          + '<div class="price-section">'
+          +   '<div class="current-price">' + formatNum(close) + '</div>'
+          +   '<div class="currency">' + esc(currency) + '</div>'
+          +   '<div class="price-change ' + direction + '">' + arrow + formatNum(change) + ' (' + arrow + changePct.toFixed(2) + '%)</div>'
+          + '</div>'
+          + '<div class="stats-grid">'
+          +   '<div class="stat-item"><div class="stat-label">Open</div><div class="stat-value">' + formatNum(open) + '</div></div>'
+          +   '<div class="stat-item"><div class="stat-label">Day High</div><div class="stat-value green">' + formatNum(high) + '</div></div>'
+          +   '<div class="stat-item"><div class="stat-label">Day Low</div><div class="stat-value red">' + formatNum(low) + '</div></div>'
+          +   '<div class="stat-item"><div class="stat-label">Prev Close</div><div class="stat-value">' + (prevClose != null ? formatNum(prevClose) : 'N/A') + '</div></div>'
+          +   '<div class="stat-item"><div class="stat-label">Volume</div><div class="stat-value">' + (volume != null ? volume.toLocaleString() : 'N/A') + '</div></div>'
+          +   '<div class="stat-item"><div class="stat-label">Day Range</div><div class="stat-value">' + formatNum(low) + ' - ' + formatNum(high) + '</div></div>'
+          +   '<div class="stat-item"><div class="stat-label">52W High</div><div class="stat-value green">' + (w52High != null ? formatNum(w52High) : 'N/A') + '</div></div>'
+          +   '<div class="stat-item"><div class="stat-label">52W Low</div><div class="stat-value red">' + (w52Low != null ? formatNum(w52Low) : 'N/A') + '</div></div>'
+          + '</div>'
+          + '<div class="timestamp">Data as of ' + dateStr + ' (Tokyo time) - Source: Yahoo Finance</div>'
+          + '<div class="chart-section">'
+          +   '<div class="chart-header">'
+          +     '<div class="chart-title">Price History</div>'
+          +     '<div class="range-buttons">'
+          +       '<div class="range-btn" id="rng1mo">1M</div>'
+          +       '<div class="range-btn" id="rng3mo">3M</div>'
+          +       '<div class="range-btn active" id="rng6mo">6M</div>'
+          +       '<div class="range-btn" id="rng1y">1Y</div>'
+          +     '</div>'
+          +   '</div>'
+          +   '<div class="chart-hover-info" id="chartHoverInfo"> </div>'
+          +   '<div class="chart-container"><canvas id="priceChart"></canvas></div>'
+          +   '<div class="chart-loading" id="chartLoading">Loading chart...</div>'
+          + '</div>';
+
+        document.getElementById('addPortfolioBtn').addEventListener('click', function() {
+            openAddToPortfolio(window._lastSymbol, window._lastName, window._lastClose);
+        });
+        var sym = meta.symbol;
+        document.getElementById('rng1mo').addEventListener('click', function() { loadChart(sym, '1mo'); });
+        document.getElementById('rng3mo').addEventListener('click', function() { loadChart(sym, '3mo'); });
+        document.getElementById('rng6mo').addEventListener('click', function() { loadChart(sym, '6mo'); });
+        document.getElementById('rng1y').addEventListener('click',  function() { loadChart(sym, '1y');  });
+
+        hide('loading');
+        show('stockCard');
+        loadChart(meta.symbol, '6mo');
+    } catch (err) {
+        hide('loading');
+        showError('Could not fetch data for ' + symbol + ': ' + err.message);
+    }
+}
+
+// Chart
+var priceChart = null;
+var crosshairPlugin = {
+    id: 'crosshair',
+    afterDraw: function(chart) {
+        if (chart._active && chart._active.length) {
+            var ap  = chart._active[0];
+            var ctx = chart.ctx;
+            var x = ap.element.x, y = ap.element.y;
+            var topY = chart.scales.y.top, bottomY = chart.scales.y.bottom;
+            var leftX = chart.scales.x.left, rightX = chart.scales.x.right;
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(10,186,181,0.4)';
+            ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, bottomY); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(leftX, y); ctx.lineTo(rightX, y); ctx.stroke();
+            ctx.restore();
+        }
+    }
+};
+async function loadChart(symbol, range) {
+    document.querySelectorAll('.range-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.textContent === rangeLabel(range));
+    });
+    var chartLoading = document.getElementById('chartLoading');
+    var canvas       = document.getElementById('priceChart');
+    var hoverInfo    = document.getElementById('chartHoverInfo');
+    chartLoading.style.display = 'block';
+    canvas.style.display = 'none';
+    hoverInfo.innerHTML = ' ';
+    try {
+        var data = await fetchYahoo(
+            'https://query1.finance.yahoo.com/v8/finance/chart/' + symbol + '?interval=1d&range=' + range
+        );
+        var result = data.chart && data.chart.result && data.chart.result[0];
+        if (!result) throw new Error('No chart data');
+        var timestamps   = result.timestamp || [];
+        var closes       = result.indicators && result.indicators.quote && result.indicators.quote[0] && result.indicators.quote[0].close || [];
+        var currentPrice = result.meta.regularMarketPrice;
+        var labels = [], prices = [], fullDates = [];
+        for (var i = 0; i < timestamps.length; i++) {
+            var price = closes[i];
+            if (price != null && currentPrice && price < currentPrice * 20 && price > currentPrice * 0.05) {
+                var d = new Date(timestamps[i] * 1000);
+                labels.push(d.toLocaleDateString('en-JP', { month:'short', day:'numeric', timeZone:'Asia/Tokyo' }));
+                fullDates.push(d.toLocaleDateString('en-JP', { year:'numeric', month:'short', day:'numeric', timeZone:'Asia/Tokyo' }));
+                prices.push(price);
+            }
+        }
+        if (prices.length === 0) throw new Error('No valid chart data');
+        var startPrice = prices[0];
+        var isUp       = prices[prices.length - 1] >= prices[0];
+        var lineColor  = isUp ? '#0ABAB5' : '#ff5252';
+        var fillColor  = isUp ? 'rgba(10,186,181,0.10)' : 'rgba(255,82,82,0.10)';
+        if (priceChart) priceChart.destroy();
+        chartLoading.style.display = 'none';
+        canvas.style.display = 'block';
+        priceChart = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Close Price', data: prices,
+                    borderColor: lineColor, backgroundColor: fillColor,
+                    borderWidth: 2, pointRadius: 0, pointHoverRadius: 6,
+                    pointHoverBackgroundColor: lineColor, pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2, fill: true, tension: 0.1
+                }]
+            },
+            plugins: [crosshairPlugin],
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { intersect: false, mode: 'index' },
+                onHover: function(event, elements) {
+                    if (elements.length > 0) {
+                        var idx     = elements[0].index;
+                        var p       = prices[idx];
+                        var date    = fullDates[idx];
+                        var diff    = p - startPrice;
+                        var diffPct = (diff / startPrice) * 100;
+                        var sign    = diff >= 0 ? '+' : '';
+                        var cls2    = diff >= 0 ? 'up' : 'down';
+                        hoverInfo.innerHTML =
+                            '<span style="color:#7fb8b6">' + date + '</span> '
+                          + '<span class="hover-price">' + p.toLocaleString('en-US', {maximumFractionDigits:2}) + ' JPY</span> '
+                          + '<span class="hover-change ' + cls2 + '">' + sign + diff.toLocaleString('en-US', {maximumFractionDigits:2}) + ' (' + sign + diffPct.toFixed(2) + '%)</span>';
+                    }
+                },
+                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                scales: {
+                    x: { ticks: { color:'#456a68', maxTicksLimit:8, maxRotation:0 }, grid: { color:'#0e2626' } },
+                    y: { ticks: { color:'#456a68', callback: function(v) { return v.toLocaleString(); } }, grid: { color:'#0e2626' } }
+                }
+            }
+        });
+        canvas.addEventListener('mouseleave', function() { hoverInfo.innerHTML = ' '; });
+    } catch (err) {
+        chartLoading.textContent = 'Could not load chart data';
+        chartLoading.style.display = 'block';
+        canvas.style.display = 'none';
+    }
+}
+function rangeLabel(range) {
+    return { '1mo':'1M', '3mo':'3M', '6mo':'6M', '1y':'1Y' }[range] || range;
+}
+
+// Portfolio rendering
+async function renderPortfolio() {
+    var portfolio = await gasListPositions();
+    var rowsEl    = document.getElementById('portfolioRows');
+    var summaryEl = document.getElementById('portfolioSummary');
+    var totalPlEl = document.getElementById('portfolioTotalPl');
+    if (portfolio.length === 0) {
+        rowsEl.innerHTML = '<div class="portfolio-empty">No stocks yet. Search a stock and click "+ Portfolio".</div>';
+        summaryEl.style.display = 'none';
+        totalPlEl.textContent = '';
+        document.getElementById('allocationChart').style.display = 'none';
+        return;
+    }
+    rowsEl.innerHTML = '<div class="portfolio-empty">Loading live prices...</div>';
+
+    var symbols  = portfolio.map(function(p) { return p.symbol; });
+    var priceMap = await gasRun('fetchAllPrices', symbols);
+    var prices   = portfolio.map(function(p) { return priceMap[p.symbol] || null; });
+
+    var totalInvested = 0, totalCurrent = 0, allPricesLoaded = true;
+    var chartLabels = [], chartValues = [], chartPlPcts = [];
+    var html = '';
+
+    portfolio.forEach(function(pos, i) {
+        var currentPrice = prices[i];
+        var invested     = pos.buyPrice * pos.shares;
+        totalInvested   += invested;
+        var currentVal = null, pl = null, plPct = null, plClass = 'pl-zero';
+        if (currentPrice != null) {
+            currentVal     = currentPrice * pos.shares;
+            totalCurrent  += currentVal;
+            pl             = currentVal - invested;
+            plPct          = invested > 0 ? (pl / invested) * 100 : 0;
+            plClass        = pl > 0 ? 'pl-positive' : pl < 0 ? 'pl-negative' : 'pl-zero';
+            chartLabels.push(pos.name);
+            chartValues.push(currentVal);
+            chartPlPcts.push(plPct);
+        } else {
+            allPricesLoaded = false;
+            totalCurrent   += invested;
+        }
+        var buyDateFmt = pos.buyDate ? formatDateDisplay(pos.buyDate) : '';
+        var plHtml = pl != null
+            ? '<div class="pl-value ' + plClass + '">' + (pl >= 0 ? '+' : '') + '\u00A5' + formatNum(Math.abs(pl)) + '</div>'
+            + '<div class="pl-pct '   + plClass + '">(' + (pl >= 0 ? '+' : '') + plPct.toFixed(1) + '%)</div>'
+            : '<span style="color:#456a68">--</span>';
+
+        html +=
+            '<div class="portfolio-row">'
+          + '<div class="portfolio-stock-info">'
+          +   '<div class="portfolio-stock-name" data-code="' + pos.symbol.replace('.T', '') + '">' + esc(pos.name) + '</div>'
+          +   '<div class="portfolio-stock-detail">' + esc(pos.symbol) + (pos.notes ? ' - ' + esc(pos.notes) : '') + '</div>'
+          + '</div>'
+          + '<div class="portfolio-position">' + pos.shares + ' shares @ \u00A5' + formatNum(pos.buyPrice)
+          +   '<br><span style="color:#456a68;font-size:0.75rem;">' + buyDateFmt + '</span></div>'
+          + '<div class="portfolio-current"><div class="current-label">Now</div>'
+          +   (currentPrice != null ? '\u00A5' + formatNum(currentPrice) : '<span style="color:#456a68">--</span>')
+          + '</div>'
+          + '<div class="portfolio-pl">' + plHtml
+          +   '<div class="portfolio-actions">'
+          +     '<button class="portfolio-btn sell" data-idx="' + i + '">sell</button>'
+          +     '<button class="portfolio-btn" data-edit="' + i + '">edit</button>'
+          +     '<button class="portfolio-btn delete" data-del="' + i + '">del</button>'
+          +   '</div>'
+          + '</div>'
+          + '</div>';
+    });
+
+    rowsEl.innerHTML = html;
+    rowsEl.querySelectorAll('.portfolio-stock-name[data-code]').forEach(function(el) {
+        el.addEventListener('click', function() { quickSearch(el.dataset.code); });
+    });
+    rowsEl.querySelectorAll('[data-idx]').forEach(function(btn) {
+        btn.addEventListener('click', function() { openSellModal(parseInt(btn.dataset.idx)); });
+    });
+    rowsEl.querySelectorAll('[data-edit]').forEach(function(btn) {
+        btn.addEventListener('click', function() { openEditPosition(parseInt(btn.dataset.edit)); });
+    });
+    rowsEl.querySelectorAll('[data-del]').forEach(function(btn) {
+        btn.addEventListener('click', function() { deletePos(parseInt(btn.dataset.del)); });
+    });
+
+    var totalPl    = totalCurrent - totalInvested;
+    var totalPlPct = totalInvested > 0 ? (totalPl / totalInvested) * 100 : 0;
+    var totalClass = totalPl > 0 ? 'pl-positive' : totalPl < 0 ? 'pl-negative' : 'pl-zero';
+
+    summaryEl.style.display = 'grid';
+    summaryEl.innerHTML =
+        '<div class="summary-item"><div class="summary-label">Total Invested</div><div class="summary-value">\u00A5' + formatNum(totalInvested) + '</div></div>'
+      + '<div class="summary-item"><div class="summary-label">Current Value</div><div class="summary-value">\u00A5' + formatNum(totalCurrent) + '</div></div>'
+      + '<div class="summary-item"><div class="summary-label">Unrealized P&L</div><div class="summary-value ' + totalClass + '">'
+      +   (totalPl >= 0 ? '+' : '') + '\u00A5' + formatNum(Math.abs(totalPl)) + ' (' + (totalPl >= 0 ? '+' : '') + totalPlPct.toFixed(1) + '%)</div></div>'
+      + '<div class="summary-item"><div class="summary-label">Realized P&L</div><div class="summary-value" id="realizedPlValue" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;">--</div></div>';
+
+    document.getElementById('realizedPlValue').addEventListener('click', showRealizedDetail);
+
+    if (allPricesLoaded && portfolio.length > 0) {
+        totalPlEl.innerHTML = '<span class="' + totalClass + '">Total P&L: '
+            + (totalPl >= 0 ? '+' : '') + '\u00A5' + formatNum(Math.abs(totalPl))
+            + ' (' + (totalPl >= 0 ? '+' : '') + totalPlPct.toFixed(1) + '%)</span>';
+    } else {
+        totalPlEl.textContent = '';
+    }
+
+    // Treemap
+    var chartContainer = document.getElementById('allocationChart');
+    var gridEl         = document.getElementById('treemapGrid');
+    if (allPricesLoaded && chartValues.length >= 1) {
+        chartContainer.style.display = 'block';
+        var totalVal = chartValues.reduce(function(a, b) { return a + b; }, 0);
+        var tmHtml = '';
+        chartLabels.forEach(function(name, i) {
+            var pct       = totalVal > 0 ? (chartValues[i] / totalVal) * 100 : 0;
+            var plp       = chartPlPcts[i] || 0;
+            var sign      = plp >= 0 ? '+' : '';
+            var intensity = Math.min(Math.abs(plp) / 10, 1);
+            var bg;
+            if (plp > 0) {
+                bg = 'rgb(' + Math.round(30+(0-30)*intensity) + ',' + Math.round(60+(140-60)*intensity) + ',50)';
+            } else if (plp < 0) {
+                bg = 'rgb(' + Math.round(60+(180-60)*intensity) + ',30,35)';
+            } else {
+                bg = '#2a3a3a';
+            }
+            tmHtml += '<div class="treemap-cell" style="flex-grow:' + Math.max(pct,8).toFixed(1) + ';background:' + bg + '">'
+                    + '<div class="treemap-name">' + esc(name) + '</div>'
+                    + '<div class="treemap-pct">' + sign + plp.toFixed(1) + '%</div>'
+                    + '<div class="treemap-val">\u00A5' + formatNum(chartValues[i]) + '</div>'
+                    + '</div>';
+        });
+        gridEl.innerHTML = tmHtml;
+    } else {
+        chartContainer.style.display = 'none';
+    }
+    loadRealizedPl();
+}
+
+async function loadRealizedPl() {
+    var el = document.getElementById('realizedPlValue');
+    if (!el) return;
+    try {
+        var sales = await gasGetSales();
+        var total = sales.reduce(function(sum, s) { return sum + Number(s.profit || 0); }, 0);
+        var cls   = total > 0 ? 'pl-positive' : total < 0 ? 'pl-negative' : 'pl-zero';
+        el.className    = 'summary-value ' + cls;
+        el.textContent  = (total >= 0 ? '+' : '') + '\u00A5' + formatNum(Math.abs(total));
+    } catch(e) { if (el) el.textContent = '--'; }
+}
+
+async function showRealizedDetail() {
+    var sales = await gasGetSales();
+    if (sales.length === 0) { alert('No sales history yet.'); return; }
+    var total = sales.reduce(function(sum, s) { return sum + Number(s.profit || 0); }, 0);
+    var lines = sales.map(function(s) {
+        var p = Number(s.profit || 0);
+        return (s.name || s.symbol) + '  ' + s.shares + ' shares  \u00A5' + formatNum(s.buyPrice) + ' -> \u00A5' + formatNum(s.sellPrice) + '  ' + (p >= 0 ? '+' : '') + '\u00A5' + formatNum(Math.abs(p));
+    });
+    lines.push('------------------------------');
+    lines.push('Total Realized: ' + (total >= 0 ? '+' : '') + '\u00A5' + formatNum(Math.abs(total)));
+    alert(lines.join('\n'));
+}
+
+// Modal: add / edit
+var modalMode = 'add', modalEditIndex = -1, modalSymbol = '', modalName = '';
+function openAddToPortfolio(symbol, name, currentPrice) {
+    modalMode = 'add'; modalEditIndex = -1; modalSymbol = symbol; modalName = name;
+    document.getElementById('modalTitle').textContent    = 'Add to Portfolio';
+    document.getElementById('modalStock').value          = name + ' (' + symbol + ')';
+    document.getElementById('modalBuyPrice').value       = currentPrice || '';
+    document.getElementById('modalBuyDate').value        = new Date().toISOString().split('T')[0];
+    document.getElementById('modalShares').value         = '100';
+    document.getElementById('modalNotes').value          = '';
+    document.getElementById('modalSaveBtn').textContent  = 'Add';
+    document.getElementById('portfolioModal').classList.add('active');
+}
+async function openEditPosition(index) {
+    var portfolio = await gasListPositions();
+    var pos = portfolio[index];
+    if (!pos) return;
+    modalMode = 'edit'; modalEditIndex = index; modalSymbol = pos.symbol; modalName = pos.name;
+    document.getElementById('modalTitle').textContent   = 'Edit Position';
+    document.getElementById('modalStock').value         = pos.name + ' (' + pos.symbol + ')';
+    document.getElementById('modalBuyPrice').value      = pos.buyPrice;
+    document.getElementById('modalBuyDate').value       = pos.buyDate || '';
+    var sel = document.getElementById('modalShares');
+    var existing = Array.from(sel.options).map(function(o) { return parseInt(o.value); });
+    if (existing.indexOf(pos.shares) === -1) {
+        var opt = document.createElement('option');
+        opt.value = pos.shares; opt.textContent = pos.shares;
+        sel.appendChild(opt);
+    }
+    sel.value = pos.shares;
+    document.getElementById('modalNotes').value         = pos.notes || '';
+    document.getElementById('modalSaveBtn').textContent = 'Update';
+    document.getElementById('portfolioModal').classList.add('active');
+}
+function closeModal() { document.getElementById('portfolioModal').classList.remove('active'); }
+async function saveModalPosition() {
+    var buyPrice = parseFloat(document.getElementById('modalBuyPrice').value);
+    var buyDate  = document.getElementById('modalBuyDate').value;
+    var shares   = parseInt(document.getElementById('modalShares').value);
+    var notes    = document.getElementById('modalNotes').value.trim();
+    if (!buyPrice || buyPrice <= 0) { alert('Please enter a valid buy price.'); return; }
+    if (!shares   || shares   <= 0) { alert('Please select a valid number of shares.'); return; }
+    var pos = { symbol: modalSymbol, name: modalName, buyPrice: buyPrice, buyDate: buyDate, shares: shares, notes: notes };
+    try {
+        if (modalMode === 'add') { await gasAddPosition(pos); } else { await gasEditPosition(modalEditIndex, pos); }
+        closeModal(); renderPortfolio();
+    } catch (err) { alert('Failed to save: ' + err.message); }
+}
+async function deletePos(index) {
+    var portfolio = await gasListPositions();
+    var pos = portfolio[index];
+    if (!pos) return;
+    if (!confirm('Remove ' + pos.name + ' (' + pos.shares + ' shares) from portfolio?')) return;
+    try { await gasDeletePosition(index); renderPortfolio(); }
+    catch (err) { alert('Failed to delete: ' + err.message); }
+}
+document.getElementById('portfolioModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+
+// Modal: sell
+var sellIndex = -1, sellBuyPrice = 0, sellMaxShares = 0;
+async function openSellModal(index) {
+    var portfolio = await gasListPositions();
+    var pos = portfolio[index];
+    if (!pos) return;
+    sellIndex = index; sellBuyPrice = pos.buyPrice; sellMaxShares = pos.shares;
+    document.getElementById('sellModalStock').value    = pos.name + ' (' + pos.symbol + ')';
+    document.getElementById('sellModalBuyPrice').value = '\u00A5' + formatNum(pos.buyPrice);
+    document.getElementById('sellModalSharesLabel').textContent = 'Shares to Sell (max ' + pos.shares + ')';
+    var sel = document.getElementById('sellModalShares');
+    sel.innerHTML = '';
+    for (var lot = 100; lot <= pos.shares; lot += 100) {
+        var opt = document.createElement('option');
+        opt.value = lot; opt.textContent = lot; sel.appendChild(opt);
+    }
+    sel.value = pos.shares;
+    document.getElementById('sellModalPrice').value = '';
+    document.getElementById('sellModalDate').value  = new Date().toISOString().split('T')[0];
+    document.getElementById('sellModalProfit').textContent   = '--';
+    document.getElementById('sellModalProfit').style.color   = '#fff';
+    document.getElementById('sellModal').classList.add('active');
+    updateSellProfit();
+}
+function closeSellModal() { document.getElementById('sellModal').classList.remove('active'); }
+function updateSellProfit() {
+    var shares = parseInt(document.getElementById('sellModalShares').value) || 0;
+    var price  = parseFloat(document.getElementById('sellModalPrice').value) || 0;
+    var el     = document.getElementById('sellModalProfit');
+    if (price > 0 && shares > 0) {
+        var profit = (price - sellBuyPrice) * shares;
+        el.textContent = (profit >= 0 ? '+' : '') + '\u00A5' + formatNum(Math.abs(profit));
+        el.style.color = profit >= 0 ? '#0ABAB5' : '#ff5252';
+    } else { el.textContent = '--'; el.style.color = '#fff'; }
+}
+document.getElementById('sellModalShares').addEventListener('change', updateSellProfit);
+document.getElementById('sellModalPrice').addEventListener('input', updateSellProfit);
+async function confirmSell() {
+    var sellShares = parseInt(document.getElementById('sellModalShares').value);
+    var sellPrice  = parseFloat(document.getElementById('sellModalPrice').value);
+    var sellDate   = document.getElementById('sellModalDate').value;
+    if (!sellShares || sellShares <= 0) { alert('Please select shares to sell.'); return; }
+    if (sellShares > sellMaxShares)     { alert('Cannot sell more than ' + sellMaxShares + ' shares.'); return; }
+    if (!sellPrice  || sellPrice  <= 0) { alert('Please enter a valid sell price.'); return; }
+    var profit = (sellPrice - sellBuyPrice) * sellShares;
+    if (!confirm('Sell ' + sellShares + ' shares @ \u00A5' + formatNum(sellPrice) + '?\nProfit: ' + (profit >= 0 ? '+' : '') + '\u00A5' + formatNum(Math.abs(profit)))) return;
+    try {
+        await gasSellPosition(sellIndex, { sellPrice: sellPrice, sellDate: sellDate, sellShares: sellShares });
+        closeSellModal(); renderPortfolio();
+    } catch (err) { alert('Failed to sell: ' + err.message); }
+}
+document.getElementById('sellModal').addEventListener('click', function(e) {
+    if (e.target === this) closeSellModal();
+});
+
+// Utilities
+function formatNum(n) {
+    if (n == null || isNaN(n)) return 'N/A';
+    return Number(n).toLocaleString('en-US', { minimumFractionDigits: n % 1 === 0 ? 0 : 1, maximumFractionDigits: 2 });
+}
+function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+}
+function formatDateDisplay(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr.indexOf('T') !== -1 ? dateStr : dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return String(dateStr);
+    return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+}
+function hideAll() { hide('loading'); hide('error'); hide('stockCard'); hide('multiResults'); }
+function show(id)  { document.getElementById(id).style.display = 'block'; }
+function hide(id)  { document.getElementById(id).style.display = 'none'; }
+function showError(msg) { var el = document.getElementById('error'); el.textContent = msg; show('error'); }
+
+// Boot
+
+var _baseUrl = '';
+function initNav() {
+    gasRun('getDeploymentUrl').then(function(url) {
+        _baseUrl = url;
+    }).catch(function() {
+        _baseUrl = '';
+    });
+}
+function navigate(page) {
+    var url = _baseUrl || window.top.location.href.split('?')[0];
+    window.top.location.href = url + '?page=' + page;
+}
+
+initNav();
+renderPortfolio();
+</script>
+</body>
+</html>
