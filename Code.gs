@@ -21,7 +21,12 @@ function doGet(e) {
     var page   = (e && e.parameter && e.parameter.page) || "portfolio";
     var valid  = ["portfolio", "growth", "history","watchlist"];
     if (valid.indexOf(page) === -1) page = "portfolio";
-    var titles = { portfolio: "TSE Tracker", growth: "TSE Tracker - Growth", history: "TSE Tracker - History" };
+    var titles = {
+      portfolio: "TSE Tracker",
+      growth: "TSE Tracker - Growth",
+      history: "TSE Tracker - History",
+      watchlist: "TSE Tracker - Watchlist"
+    };
     var file   = page === "portfolio" ? "index" : page;
     return HtmlService
       .createHtmlOutputFromFile(file)
@@ -486,14 +491,6 @@ function jsonErr(msg) {
 
 // ============================================================
 //  WATCHLIST ADD-ON — single clean copy
-//  Replace everything from here to the end of your Code.gs with
-//  this block (delete both duplicated copies first).
-//
-//  ROUTING: doGet() must already have "watchlist" in valid pages:
-//    var valid = ["portfolio", "growth", "history", "watchlist"];
-//
-//  NAV: index.html, growth.html, history.html each need a 4th
-//  nav button:  <button class="nav-link" onclick="navigate('watchlist')">Watchlist</button>
 // ============================================================
 
 

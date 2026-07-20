@@ -155,7 +155,7 @@
     
 
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Enter stock code (e.g. 7203) or company name (e.g. Toyota)" autocomplete="off">
+        <input type="text" id="searchInput" placeholder="Enter stock code (e.g. 7203, 278A) or company name (e.g. Toyota)" autocomplete="off">
         <button onclick="search()">Search</button>
     </div>
 
@@ -302,8 +302,11 @@ async function search() {
     if (!query) return;
     hideAll();
     show('loading');
-    if (/^\d{4}$/.test(query)) {
-        await fetchStock(query + '.T');
+    // TSE codes are normally 4 digits, but new-listing (IPO) codes can mix
+    // in a trailing letter, e.g. 278A (Terra Drone). Treat any 4-character
+    // alphanumeric code as a ticker instead of a name search.
+    if (/^[0-9A-Za-z]{4}$/.test(query)) {
+        await fetchStock(query.toUpperCase() + '.T');
     } else {
         await searchByName(query);
     }
@@ -318,7 +321,7 @@ async function searchByName(query) {
         });
         hide('loading');
         if (quotes.length === 0) {
-            showError('No TSE stocks found for: ' + query + '. Try a 4-digit stock code.');
+            showError('No TSE stocks found for: ' + query + '. Try a 4-character stock code.');
         } else if (quotes.length === 1) {
             show('loading');
             await fetchStock(quotes[0].symbol);

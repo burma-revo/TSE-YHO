@@ -88,7 +88,7 @@
 <div class="modal-overlay" id="addModal">
     <div class="modal">
         <div class="modal-title">Add to watchlist</div>
-        <div class="modal-field"><label>Stock code (e.g. 7203)</label><input type="text" id="addSymbol" placeholder="4-digit code"></div>
+        <div class="modal-field"><label>Stock code (e.g. 7203 or 278A)</label><input type="text" id="addSymbol" placeholder="4-character code" maxlength="4" style="text-transform:uppercase;"></div>
         <div class="modal-field"><label>Notice price (JPY)</label><input type="number" id="addPrice" step="0.01" min="0"></div>
         <div class="modal-field"><label>Notice date</label><input type="date" id="addDate"></div>
         <div class="modal-buttons">
@@ -270,10 +270,13 @@ function openAddModal() {
 function closeAddModal() { document.getElementById('addModal').classList.remove('active'); }
 
 async function saveWatchItem() {
-    var code = document.getElementById('addSymbol').value.trim();
+    var code = document.getElementById('addSymbol').value.trim().toUpperCase();
     var price = parseFloat(document.getElementById('addPrice').value);
     var date = document.getElementById('addDate').value;
-    if (!/^\d{4}$/.test(code)) { alert('Enter a valid 4-digit stock code.'); return; }
+    // TSE codes are normally 4 digits, but new-listing (IPO) codes can mix
+    // in a trailing letter, e.g. 278A (Terra Drone). Accept any 4-char
+    // alphanumeric code, uppercase letters only.
+    if (!/^[0-9A-Z]{4}$/.test(code)) { alert('Enter a valid 4-character stock code (e.g. 7203 or 278A).'); return; }
     if (!price || price <= 0) { alert('Enter a valid notice price.'); return; }
     var symbol = code + '.T';
     try {

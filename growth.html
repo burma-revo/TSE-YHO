@@ -4,38 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TSE Tracker - Portfolio Growth</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js">
-var _baseUrl = '';
-function initNav() {
-    gasRun('getDeploymentUrl').then(function(url) {
-        _baseUrl = url;
-    }).catch(function() {
-        _baseUrl = '';
-    });
-}
-function navigate(page) {
-    var url = _baseUrl || window.top.location.href.split('?')[0];
-    window.top.location.href = url + '?page=' + page;
-}
-
-initNav();
-
-var _baseUrl = '';
-function initNav() {
-    gasRun('getDeploymentUrl').then(function(url) {
-        _baseUrl = url;
-    }).catch(function() {
-        _baseUrl = '';
-    });
-}
-function navigate(page) {
-    var url = _baseUrl || window.top.location.href.split('?')[0];
-    window.top.location.href = url + '?page=' + page;
-}
-
-initNav();
-init();
-</script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a1a1a; color: #e0e0e0; min-height: 100vh; padding: 20px; }
@@ -338,7 +307,6 @@ function fmtDate(d) {
     var dd = ('0' + d.getDate()).slice(-2);
     return y + '-' + m + '-' + dd;
 }
-
 
 var _baseUrl = '';
 function initNav() {
