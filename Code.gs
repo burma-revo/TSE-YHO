@@ -19,13 +19,14 @@ function doGet(e) {
   // Serve HTML pages
   if (!action) {
     var page   = (e && e.parameter && e.parameter.page) || "portfolio";
-    var valid  = ["portfolio", "growth", "history","watchlist"];
+    var valid  = ["portfolio", "growth", "history", "watchlist", "calendar"];
     if (valid.indexOf(page) === -1) page = "portfolio";
     var titles = {
       portfolio: "TSE Tracker",
       growth: "TSE Tracker - Growth",
       history: "TSE Tracker - History",
-      watchlist: "TSE Tracker - Watchlist"
+      watchlist: "TSE Tracker - Watchlist",
+      calendar: "TSE Tracker - Calendar"
     };
     var file   = page === "portfolio" ? "index" : page;
     return HtmlService
@@ -569,31 +570,7 @@ function moveWatchlistToPortfolio(index, buyData) {
 // --- Sector lookup (cached 6h) -------------------------------
 // Shown as a small badge on each watchlist row.
 
-function getSector(symbol) {
-  var cache = CacheService.getScriptCache();
-  var key = "sector_" + symbol;
-  var cached = cache.get(key);
-  if (cached) return cached;
 
-  try {
-    var url = "https://query1.finance.yahoo.com/v10/finance/quoteSummary/" + symbol + "?modules=assetProfile";
-    var res = UrlFetchApp.fetch(url, {
-      muteHttpExceptions: true,
-      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" }
-    });
-    if (res.getResponseCode() !== 200) return "";
-    var data = JSON.parse(res.getContentText());
-    var profile = data.quoteSummary &&
-                  data.quoteSummary.result &&
-                  data.quoteSummary.result[0] &&
-                  data.quoteSummary.result[0].assetProfile;
-    var sector = (profile && profile.sector) || "";
-    if (sector) cache.put(key, sector, 21600);
-    return sector;
-  } catch (e) {
-    return "";
-  }
-}
 
 
 // --- Weekly price history for watchlist ---------------------
@@ -676,3 +653,401 @@ function deleteWatchlistItemFromClient(index)  { return deleteWatchlistItem(inde
 function moveToPortfolioFromClient(index, buy) { return moveWatchlistToPortfolio(index, buy); }
 function getWatchlistHistoryFromClient()       { return getWatchlistHistory(); }
 function recordWatchlistPricesFromClient()     { recordWatchlistPrices(); return getWatchlistHistory(); }
+
+// ============================================================
+//  KEY DATES ADD-ON — earnings / dividend / 優待 / custom dates
+//  Appends to Code.gs. Requires:
+//    - "calendar" added to doGet's `valid` page list and `titles` map
+//    - a Calendar nav link added to index/growth/history/watchlist.html
+//    - calendar.html added as a project file
+//
+//  AUTOMATIC WEEKLY FETCH:
+//    Apps Script editor -> Triggers -> + Add Trigger
+//    Function: fetchKeyDatesForPortfolio
+//    Event source: Time-driven, Type: Week timer
+//    Day of week: Monday, Time: 6am to 7am
+//  (Runs before recordWatchlistPrices so both weekly jobs stay together.)
+// ============================================================
+
+
+// --- KeyDates sheet -------------------------------------------
+
+function getKeyDatesSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("KeyDates");
+  if (!sheet) {
+    sheet = ss.insertSheet("KeyDates");
+    sheet.appendRow(["symbol", "name", "eventType", "date", "note", "source", "calendarEventId"]);
+    sheet.getRange(1, 1, 1, 7).setFontWeight("bold");
+  }
+  return sheet;
+}
+
+// eventType values: "earnings", "dividend", "exdividend", "yutai", "custom"
+// source values: "auto" (from weekly Yahoo fetch) or "manual" (user-entered)
+
+function getAllKeyDates() {
+  var sheet = getKeyDatesSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return [];
+  return sheet.getRange(2, 1, lastRow - 1, 7).getValues().map(function(row) {
+    return {
+      symbol:          row[0] || "",
+      name:            row[1] || "",
+      eventType:       row[2] || "custom",
+      date:            row[3] ? formatDate(row[3]) : "",
+      note:            row[4] || "",
+      source:          row[5] || "manual",
+      calendarEventId: row[6] || ""
+    };
+  }).filter(function(r) { return r.date !== ""; });
+}
+
+function addKeyDate(item) {
+  var sheet = getKeyDatesSheet();
+  var calendarEventId = "";
+  if (item.pushToCalendar) {
+    calendarEventId = createCalendarEventForKeyDate(item.symbol, item.name, item.eventType, item.date, item.note);
+  }
+  sheet.appendRow([
+    item.symbol || "",
+    item.name || "",
+    item.eventType || "custom",
+    item.date || "",
+    item.note || "",
+    item.source || "manual",
+    calendarEventId
+  ]);
+  return getAllKeyDates();
+}
+
+function deleteKeyDate(index) {
+  var sheet = getKeyDatesSheet();
+  var row = index + 2;
+  if (row < 2 || row > sheet.getLastRow()) throw new Error("Invalid index: " + index);
+
+  // Also remove the linked Google Calendar event, if any
+  var calId = sheet.getRange(row, 7).getValue();
+  if (calId) {
+    try {
+      var ev = CalendarApp.getDefaultCalendar().getEventById(calId);
+      if (ev) ev.deleteEvent();
+    } catch (e) {}
+  }
+  sheet.deleteRow(row);
+  return getAllKeyDates();
+}
+
+function pushKeyDateToCalendar(index) {
+  var sheet = getKeyDatesSheet();
+  var row = index + 2;
+  if (row < 2 || row > sheet.getLastRow()) throw new Error("Invalid index: " + index);
+  var values = sheet.getRange(row, 1, 1, 7).getValues()[0];
+  if (values[6]) throw new Error("Already on Google Calendar");
+  var calendarEventId = createCalendarEventForKeyDate(values[0], values[1], values[2], formatDate(values[3]), values[4]);
+  sheet.getRange(row, 7).setValue(calendarEventId);
+  return getAllKeyDates();
+}
+
+function createCalendarEventForKeyDate(symbol, name, eventType, dateStr, note) {
+  var labels = { earnings: "\uD83D\uDCCA Earnings", dividend: "\uD83D\uDCB0 Dividend", exdividend: "\uD83D\uDCB0 Ex-Dividend", yutai: "\uD83C\uDF81 \u512A\u5F85", custom: "\uD83D\uDCCC" };
+  var title = (labels[eventType] || "\uD83D\uDCCC") + " " + (name || symbol) + " (" + symbol + ")";
+  var date = new Date(dateStr + "T00:00:00");
+  var event = CalendarApp.getDefaultCalendar().createAllDayEvent(title, date, { description: note || "" });
+  return event.getId();
+}
+
+
+// --- Automatic weekly fetch from Yahoo Finance -----------------
+// Pulls upcoming earnings + dividend dates for everything currently
+// in your portfolio, and upserts them into KeyDates as source="auto".
+// 優待 (yutai) dates aren't reliably exposed by Yahoo, so those still
+// need to be added manually.
+
+function fetchKeyDatesForPortfolio() {
+  var positions = getAllPositions();
+  if (positions.length === 0) return getAllKeyDates();
+
+  var existing = getAllKeyDates();
+
+  positions.forEach(function(pos) {
+    var events = fetchYahooCalendarEvents(pos.symbol);
+    events.forEach(function(ev) {
+      upsertAutoKeyDate(pos.symbol, pos.name, ev.eventType, ev.date, existing);
+    });
+    Utilities.sleep(150); // be polite to Yahoo between symbols
+  });
+
+  return getAllKeyDates();
+}
+
+
+
+// Adds an auto-fetched date only if it's not already present for the
+// same symbol/eventType/date (avoids re-adding duplicates each week).
+function upsertAutoKeyDate(symbol, name, eventType, dateStr, existingList) {
+  if (!dateStr) return;
+  var dup = existingList.some(function(k) {
+    return k.symbol === symbol && k.eventType === eventType && k.date === dateStr;
+  });
+  if (dup) return;
+
+  // Also drop stale auto entries of the same type for this symbol
+  // (e.g. last week's earnings estimate got pushed back a date)
+  removeStaleAutoKeyDates(symbol, eventType, dateStr);
+
+  var sheet = getKeyDatesSheet();
+  sheet.appendRow([symbol, name, eventType, dateStr, "", "auto", ""]);
+  existingList.push({ symbol: symbol, name: name, eventType: eventType, date: dateStr, note: "", source: "auto", calendarEventId: "" });
+}
+
+function removeStaleAutoKeyDates(symbol, eventType, newDate) {
+  var sheet = getKeyDatesSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+  var data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  // Walk bottom-up so row deletion doesn't shift indices we still need
+  for (var i = data.length - 1; i >= 0; i--) {
+    var row = data[i];
+    var rSymbol = row[0], rType = row[2], rDate = row[3] ? formatDate(row[3]) : "", rSource = row[5];
+    if (rSymbol === symbol && rType === eventType && rSource === "auto" && rDate !== newDate) {
+      var todayStr = formatDate(new Date());
+      if (rDate >= todayStr) { // only clear future stale estimates, keep past history
+        var calId = row[6];
+        if (calId) {
+          try { var ev = CalendarApp.getDefaultCalendar().getEventById(calId); if (ev) ev.deleteEvent(); } catch (e) {}
+        }
+        sheet.deleteRow(i + 2);
+      }
+    }
+  }
+}
+
+// ============================================================
+//  YAHOO CRUMB/SESSION FIX
+//  Replaces fetchYahooCalendarEvents() and adds getYahooSession().
+//  Also fixes getSector() the same way, since it hits the same
+//  quoteSummary endpoint and will hit the same 401 eventually
+//  (Yahoo is rolling this requirement out gradually per-endpoint).
+//
+//  HOW TO APPLY:
+//  1. In Code.gs, DELETE the existing fetchYahooCalendarEvents()
+//     function and getSector() function.
+//  2. Paste this whole block in their place.
+//  3. Run debugKeyDatesFetch once manually to confirm it now
+//     returns HTTP 200 with real calendarEvents data.
+// ============================================================
+
+
+// --- Session (cookie + crumb) handling --------------------------
+// Yahoo's quoteSummary endpoint requires a valid session cookie and
+// a matching "crumb" token, obtained by:
+//   1. Hitting fc.yahoo.com to get a session cookie
+//   2. Using that cookie to request a crumb from
+//      query1.finance.yahoo.com/v1/test/getcrumb
+// Both are cached together for ~50 minutes (crumbs are session-based
+// and can expire/rotate; 50 min keeps us safely under an hour).
+
+function getYahooSession() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get("yf_session");
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) {}
+  }
+
+  var session = fetchFreshYahooSession();
+  if (session) {
+    try { cache.put("yf_session", JSON.stringify(session), 3000); } catch (e) {} // ~50 min
+  }
+  return session;
+}
+
+function fetchFreshYahooSession() {
+  var ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+
+  // Step 1: get a session cookie
+  var cookieRes = UrlFetchApp.fetch("https://fc.yahoo.com", {
+    muteHttpExceptions: true,
+    followRedirects: true,
+    headers: { "User-Agent": ua }
+  });
+  var cookieHeader = extractCookieHeader(cookieRes);
+  if (!cookieHeader) return null;
+
+  // Step 2: use the cookie to fetch a crumb
+  var crumbRes = UrlFetchApp.fetch("https://query1.finance.yahoo.com/v1/test/getcrumb", {
+    muteHttpExceptions: true,
+    headers: { "User-Agent": ua, "Cookie": cookieHeader }
+  });
+  if (crumbRes.getResponseCode() !== 200) return null;
+  var crumb = crumbRes.getContentText().trim();
+  if (!crumb || crumb.indexOf("<") !== -1) return null; // sanity check, not an HTML error page
+
+  return { cookie: cookieHeader, crumb: crumb, ua: ua };
+}
+
+// UrlFetchApp responses expose Set-Cookie via getAllHeaders(); this can
+// be a single string or an array depending on how many cookies were set.
+function extractCookieHeader(res) {
+  var headers = res.getAllHeaders();
+  var raw = headers["Set-Cookie"] || headers["set-cookie"];
+  if (!raw) return null;
+  var list = Array.isArray(raw) ? raw : [raw];
+  var pairs = list.map(function(c) { return c.split(";")[0]; });
+  return pairs.join("; ");
+}
+
+
+// --- calendarEvents fetch, now with crumb ------------------------
+
+function fetchYahooCalendarEvents(symbol) {
+  var results = [];
+  var session = getYahooSession();
+  if (!session) return results; // couldn't establish a session; skip quietly
+
+  var url = "https://query1.finance.yahoo.com/v10/finance/quoteSummary/" + symbol
+          + "?modules=calendarEvents&crumb=" + encodeURIComponent(session.crumb);
+
+  try {
+    var res = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      headers: { "User-Agent": session.ua, "Accept": "application/json", "Cookie": session.cookie }
+    });
+
+    // If the crumb went stale, refresh once and retry
+    if (res.getResponseCode() === 401) {
+      CacheService.getScriptCache().remove("yf_session");
+      session = getYahooSession();
+      if (!session) return results;
+      url = "https://query1.finance.yahoo.com/v10/finance/quoteSummary/" + symbol
+          + "?modules=calendarEvents&crumb=" + encodeURIComponent(session.crumb);
+      res = UrlFetchApp.fetch(url, {
+        muteHttpExceptions: true,
+        headers: { "User-Agent": session.ua, "Accept": "application/json", "Cookie": session.cookie }
+      });
+    }
+
+    if (res.getResponseCode() !== 200) return results;
+    var data = JSON.parse(res.getContentText());
+    var ce = data.quoteSummary &&
+             data.quoteSummary.result &&
+             data.quoteSummary.result[0] &&
+             data.quoteSummary.result[0].calendarEvents;
+    if (!ce) return results;
+
+    if (ce.earnings && ce.earnings.earningsDate && ce.earnings.earningsDate.length > 0) {
+      var raw = ce.earnings.earningsDate[0].raw;
+      if (raw) results.push({ eventType: "earnings", date: formatDate(new Date(raw * 1000)) });
+    }
+    if (ce.exDividendDate && ce.exDividendDate.raw) {
+      results.push({ eventType: "exdividend", date: formatDate(new Date(ce.exDividendDate.raw * 1000)) });
+    }
+    if (ce.dividendDate && ce.dividendDate.raw) {
+      results.push({ eventType: "dividend", date: formatDate(new Date(ce.dividendDate.raw * 1000)) });
+    }
+  } catch (e) {}
+  return results;
+}
+
+
+// --- getSector, same fix applied (also hits quoteSummary) --------
+
+function getSector(symbol) {
+  var cache = CacheService.getScriptCache();
+  var key = "sector_" + symbol;
+  var cached = cache.get(key);
+  if (cached) return cached;
+
+  var session = getYahooSession();
+  if (!session) return "";
+
+  try {
+    var url = "https://query1.finance.yahoo.com/v10/finance/quoteSummary/" + symbol
+            + "?modules=assetProfile&crumb=" + encodeURIComponent(session.crumb);
+    var res = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      headers: { "User-Agent": session.ua, "Accept": "application/json", "Cookie": session.cookie }
+    });
+
+    if (res.getResponseCode() === 401) {
+      CacheService.getScriptCache().remove("yf_session");
+      session = getYahooSession();
+      if (!session) return "";
+      url = "https://query1.finance.yahoo.com/v10/finance/quoteSummary/" + symbol
+          + "?modules=assetProfile&crumb=" + encodeURIComponent(session.crumb);
+      res = UrlFetchApp.fetch(url, {
+        muteHttpExceptions: true,
+        headers: { "User-Agent": session.ua, "Accept": "application/json", "Cookie": session.cookie }
+      });
+    }
+
+    if (res.getResponseCode() !== 200) return "";
+    var data = JSON.parse(res.getContentText());
+    var profile = data.quoteSummary &&
+                  data.quoteSummary.result &&
+                  data.quoteSummary.result[0] &&
+                  data.quoteSummary.result[0].assetProfile;
+    var sector = (profile && profile.sector) || "";
+    if (sector) cache.put(key, sector, 21600);
+    return sector;
+  } catch (e) {
+    return "";
+  }
+}
+
+
+// --- Updated debug helper (tests the crumb path directly) --------
+
+function debugKeyDatesFetch(symbol) {
+  symbol = symbol || "7203.T";
+  var session = getYahooSession();
+  Logger.log("Symbol: " + symbol);
+  if (!session) {
+    Logger.log("--> Could not establish a Yahoo session (cookie/crumb fetch failed).");
+    return { symbol: symbol, sessionOk: false };
+  }
+  Logger.log("Session OK. Crumb: " + session.crumb);
+
+  var url = "https://query1.finance.yahoo.com/v10/finance/quoteSummary/" + symbol
+          + "?modules=calendarEvents&crumb=" + encodeURIComponent(session.crumb);
+  var res = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true,
+    headers: { "User-Agent": session.ua, "Accept": "application/json", "Cookie": session.cookie }
+  });
+  var code = res.getResponseCode();
+  var text = res.getContentText();
+  Logger.log("HTTP status: " + code);
+  Logger.log("Raw response (first 1500 chars): " + text.substring(0, 1500));
+
+  if (code !== 200) return { symbol: symbol, httpStatus: code, raw: text.substring(0, 1500) };
+
+  try {
+    var data = JSON.parse(text);
+    var ce = data.quoteSummary &&
+             data.quoteSummary.result &&
+             data.quoteSummary.result[0] &&
+             data.quoteSummary.result[0].calendarEvents;
+    Logger.log("calendarEvents object: " + JSON.stringify(ce));
+    return { symbol: symbol, httpStatus: code, calendarEvents: ce };
+  } catch (e) {
+    Logger.log("--> Failed to parse JSON: " + e.message);
+    return { symbol: symbol, httpStatus: code, parseError: e.message };
+  }
+}
+
+function debugKeyDatesFetchAll() {
+  var positions = getAllPositions();
+  var out = positions.map(function(p) {
+    Logger.log("=== " + p.symbol + " (" + p.name + ") ===");
+    return debugKeyDatesFetch(p.symbol);
+  });
+  return out;
+}
+
+// --- Client-callable wrappers -----------------------------------
+
+function getAllKeyDatesFromClient()              { return getAllKeyDates(); }
+function addKeyDateFromClient(item)               { return addKeyDate(item); }
+function deleteKeyDateFromClient(index)           { return deleteKeyDate(index); }
+function pushKeyDateToCalendarFromClient(index)   { return pushKeyDateToCalendar(index); }
+function fetchKeyDatesForPortfolioFromClient()    { return fetchKeyDatesForPortfolio(); }

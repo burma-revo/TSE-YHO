@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSE Tracker - Calendar</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a1a1a; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 4px; font-size: 1.8rem; color: #0ABAB5; }
+        .subtitle { text-align: center; color: #7fb8b6; margin-bottom: 24px; font-size: 0.9rem; }
+        .nav-links { display: flex; justify-content: center; gap: 10px; margin-bottom: 28px; flex-wrap: wrap; }
+        .nav-link { color: #7fb8b6; font-size: 0.85rem; border: 1px solid #1a3a3a; padding: 5px 14px; border-radius: 20px; transition: all 0.2s; background: none; cursor: pointer; }
+        .nav-link:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .nav-link.active { border-color: #0ABAB5; color: #0ABAB5; background: rgba(10,186,181,0.1); }
+        .card { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+        .card-title { font-size: 1.1rem; font-weight: bold; color: #0ABAB5; }
+        .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .add-btn, .refresh-btn { border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: bold; padding: 6px 14px; }
+        .add-btn { background: rgba(10,186,181,0.15); color: #0ABAB5; border: 1px solid #0ABAB5; }
+        .add-btn:hover { background: #0ABAB5; color: #0a1a1a; }
+        .refresh-btn { background: none; color: #7fb8b6; border: 1px solid #1a3a3a; }
+        .refresh-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .filter-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+        .filter-btn { background: none; border: 1px solid #1a3a3a; border-radius: 16px; color: #7fb8b6; cursor: pointer; padding: 4px 12px; font-size: 0.8rem; transition: all 0.2s; }
+        .filter-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .filter-btn.active { background: #0ABAB5; border-color: #0ABAB5; color: #0a1a1a; font-weight: bold; }
+        .rows { max-height: 520px; overflow-y: auto; }
+        .rows::-webkit-scrollbar { width: 6px; }
+        .rows::-webkit-scrollbar-track { background: #0a1a1a; border-radius: 3px; }
+        .rows::-webkit-scrollbar-thumb { background: #1a3a3a; border-radius: 3px; }
+        .kd-row { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; padding: 12px 14px; background: #0a1a1a; border-radius: 8px; border: 1px solid #163030; margin-bottom: 8px; align-items: center; }
+        .kd-row:hover { border-color: #1a4a4a; }
+        .kd-badge { font-size: 0.7rem; font-weight: bold; padding: 5px 8px; border-radius: 6px; text-align: center; white-space: nowrap; }
+        .kd-badge.earnings { background: rgba(10,186,181,0.15); color: #0ABAB5; }
+        .kd-badge.dividend, .kd-badge.exdividend { background: rgba(240,160,48,0.15); color: #f0a030; }
+        .kd-badge.yutai { background: rgba(200,120,220,0.15); color: #d78ee8; }
+        .kd-badge.custom { background: #1a3a3a; color: #8fd4d1; }
+        .kd-mid { min-width: 0; }
+        .kd-name { font-weight: bold; color: #fff; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .kd-meta { font-size: 0.75rem; color: #7fb8b6; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .kd-note { font-size: 0.75rem; color: #456a68; margin-top: 2px; }
+        .kd-source-auto { color: #456a68; }
+        .kd-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+        .kd-date { font-weight: bold; font-size: 0.9rem; color: #fff; }
+        .kd-countdown { font-size: 0.72rem; }
+        .kd-countdown.soon { color: #f0a030; }
+        .kd-countdown.today { color: #0ABAB5; }
+        .kd-countdown.past { color: #456a68; }
+        .kd-actions { display: flex; gap: 4px; margin-top: 2px; }
+        .kd-btn { background: none; border: 1px solid #1a3a3a; border-radius: 6px; color: #7fb8b6; cursor: pointer; padding: 3px 8px; font-size: 0.7rem; }
+        .kd-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .kd-btn.del:hover { border-color: #ff5252; color: #ff5252; }
+        .empty { color: #456a68; text-align: center; padding: 30px 0; font-size: 0.9rem; line-height: 1.7; }
+        .modal-overlay { display: none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 24px; width: 100%; max-width: 420px; }
+        .modal-title { font-size: 1.1rem; font-weight: bold; color: #0ABAB5; margin-bottom: 18px; }
+        .modal-field { margin-bottom: 12px; }
+        .modal-field label { display: block; color: #7fb8b6; font-size: 0.8rem; margin-bottom: 4px; }
+        .modal-field input, .modal-field select, .modal-field textarea { width: 100%; padding: 9px 12px; border: 1px solid #1a3a3a; border-radius: 8px; background: #0a1a1a; color: #e0e0e0; font-size: 0.9rem; font-family: inherit; }
+        .modal-field textarea { resize: vertical; min-height: 50px; }
+        .checkbox-field { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+        .checkbox-field input { width: auto; }
+        .checkbox-field label { color: #7fb8b6; font-size: 0.85rem; margin-bottom: 0; }
+        .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+        .modal-btn { padding: 9px 18px; border-radius: 8px; font-size: 0.88rem; cursor: pointer; font-weight: bold; border: none; }
+        .modal-btn.primary { background: #0ABAB5; color: #0a1a1a; }
+        .modal-btn.secondary { background: #1a3a3a; color: #7fb8b6; }
+        @media (max-width: 600px) {
+            .kd-row { grid-template-columns: 1fr; }
+            .kd-right { align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Tokyo Stock Exchange</h1>
+    <p class="subtitle">Calendar</p>
+    <div class="nav-links">
+        <button class="nav-link" onclick="navigate('portfolio')">Portfolio</button>
+        <button class="nav-link" onclick="navigate('growth')">Growth</button>
+        <button class="nav-link" onclick="navigate('history')">History</button>
+        <button class="nav-link" onclick="navigate('watchlist')">Watchlist</button>
+        <button class="nav-link active" onclick="navigate('calendar')">Calendar</button>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Key Dates</div>
+            <div class="header-actions">
+                <button class="refresh-btn" id="refreshBtn" onclick="refreshFromPortfolio()">&#8635; Refresh from portfolio</button>
+                <button class="add-btn" onclick="openAddModal()">+ Add date</button>
+            </div>
+        </div>
+        <div class="filter-row" id="filterRow"></div>
+        <div class="rows" id="kdRows"><div class="empty">Loading...</div></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="addModal">
+    <div class="modal">
+        <div class="modal-title">Add key date</div>
+        <div class="modal-field">
+            <label>Stock</label>
+            <select id="kdSymbol"></select>
+        </div>
+        <div class="modal-field">
+            <label>Type</label>
+            <select id="kdType">
+                <option value="earnings">Earnings</option>
+                <option value="dividend">Dividend</option>
+                <option value="exdividend">Ex-Dividend</option>
+                <option value="yutai">Yutai (\u512A\u5F85)</option>
+                <option value="custom">Custom</option>
+            </select>
+        </div>
+        <div class="modal-field">
+            <label>Date</label>
+            <input type="date" id="kdDate">
+        </div>
+        <div class="modal-field">
+            <label>Note (optional)</label>
+            <textarea id="kdNote" placeholder="e.g. QoQ earnings call, minimum 100 shares for benefit"></textarea>
+        </div>
+        <div class="checkbox-field">
+            <input type="checkbox" id="kdPushCal" checked>
+            <label for="kdPushCal">Also add to Google Calendar</label>
+        </div>
+        <div class="modal-buttons">
+            <button class="modal-btn secondary" onclick="closeAddModal()">Cancel</button>
+            <button class="modal-btn primary" onclick="saveKeyDate()">Add</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function gasRun(fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function(resolve, reject) {
+        var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+        runner[fnName].apply(runner, args);
+    });
+}
+
+var allKeyDates = [];
+var portfolio = [];
+var currentFilter = 'all';
+
+var TYPE_LABELS = { earnings: 'Earnings', dividend: 'Dividend', exdividend: 'Ex-Dividend', yutai: '\u512A\u5F85', custom: 'Custom' };
+
+async function init() {
+    try {
+        var results = await Promise.all([
+            gasRun('getAllKeyDatesFromClient'),
+            gasRun('getAllPositions')
+        ]);
+        allKeyDates = results[0];
+        portfolio = results[1];
+        populateSymbolSelect();
+        render();
+    } catch(e) {
+        document.getElementById('kdRows').innerHTML = '<div class="empty">Could not load: ' + e.message + '</div>';
+    }
+}
+
+function populateSymbolSelect() {
+    var sel = document.getElementById('kdSymbol');
+    if (portfolio.length === 0) {
+        sel.innerHTML = '<option value="">No portfolio positions yet</option>';
+        return;
+    }
+    sel.innerHTML = portfolio.map(function(p) {
+        return '<option value="' + esc(p.symbol) + '" data-name="' + esc(p.name) + '">' + esc(p.name) + ' (' + esc(p.symbol) + ')</option>';
+    }).join('');
+}
+
+function buildFilters() {
+    var counts = { all: allKeyDates.length };
+    allKeyDates.forEach(function(k) { counts[k.eventType] = (counts[k.eventType]||0) + 1; });
+    var types = ['all', 'earnings', 'dividend', 'exdividend', 'yutai', 'custom'];
+    var html = '';
+    types.forEach(function(t) {
+        if (t !== 'all' && !counts[t]) return;
+        var label = t === 'all' ? 'All' : TYPE_LABELS[t];
+        html += '<button class="filter-btn' + (currentFilter===t?' active':'') + '" data-f="' + t + '">' + label + ' (' + (counts[t]||0) + ')</button>';
+    });
+    var row = document.getElementById('filterRow');
+    row.innerHTML = html;
+    row.querySelectorAll('[data-f]').forEach(function(btn) {
+        btn.addEventListener('click', function() { currentFilter = btn.getAttribute('data-f'); render(); });
+    });
+}
+
+function daysUntil(dateStr) {
+    var today = new Date(); today.setHours(0,0,0,0);
+    var d = new Date(dateStr + 'T00:00:00');
+    return Math.round((d - today) / 86400000);
+}
+
+function render() {
+    buildFilters();
+    var el = document.getElementById('kdRows');
+    if (allKeyDates.length === 0) {
+        el.innerHTML = '<div class="empty">No key dates yet.<br>Click "+ Add date" or "Refresh from portfolio" to auto-fetch earnings &amp; dividend dates.</div>';
+        return;
+    }
+    var items = allKeyDates.filter(function(k) { return currentFilter === 'all' || k.eventType === currentFilter; });
+    if (items.length === 0) {
+        el.innerHTML = '<div class="empty">No ' + TYPE_LABELS[currentFilter] + ' dates.</div>';
+        return;
+    }
+    items = items.slice().sort(function(a,b) { return a.date < b.date ? -1 : 1; });
+
+    var html = '';
+    items.forEach(function(k) {
+        var idx = allKeyDates.indexOf(k);
+        var du = daysUntil(k.date);
+        var cdClass = du < 0 ? 'past' : du === 0 ? 'today' : du <= 7 ? 'soon' : '';
+        var cdText = du < 0 ? (Math.abs(du) + 'd ago') : du === 0 ? 'Today' : ('in ' + du + 'd');
+        var sourceTag = k.source === 'auto' ? '<span class="kd-source-auto">&#9889; auto</span>' : '';
+        var calBtn = k.calendarEventId
+            ? '<span class="kd-btn" style="cursor:default;">&#10003; on cal</span>'
+            : '<button class="kd-btn" data-cal="' + idx + '">+ cal</button>';
+        html += '<div class="kd-row">'
+              + '<div class="kd-badge ' + k.eventType + '">' + TYPE_LABELS[k.eventType] + '</div>'
+              + '<div class="kd-mid">'
+              +   '<div class="kd-name">' + esc(k.name || k.symbol) + ' <span style="color:#456a68;font-weight:normal;">(' + esc(k.symbol) + ')</span></div>'
+              +   '<div class="kd-meta">' + sourceTag + '</div>'
+              +   (k.note ? '<div class="kd-note">' + esc(k.note) + '</div>' : '')
+              + '</div>'
+              + '<div class="kd-right">'
+              +   '<div class="kd-date">' + fmtDate(k.date) + '</div>'
+              +   '<div class="kd-countdown ' + cdClass + '">' + cdText + '</div>'
+              +   '<div class="kd-actions">' + calBtn + '<button class="kd-btn del" data-del="' + idx + '">del</button></div>'
+              + '</div>'
+              + '</div>';
+    });
+    el.innerHTML = html;
+    el.querySelectorAll('[data-del]').forEach(function(btn) {
+        btn.addEventListener('click', function() { deleteKeyDate(parseInt(btn.getAttribute('data-del'))); });
+    });
+    el.querySelectorAll('[data-cal]').forEach(function(btn) {
+        btn.addEventListener('click', function() { pushToCalendar(parseInt(btn.getAttribute('data-cal'))); });
+    });
+}
+
+function openAddModal() {
+    document.getElementById('kdDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('kdNote').value = '';
+    document.getElementById('kdType').value = 'earnings';
+    document.getElementById('kdPushCal').checked = true;
+    document.getElementById('addModal').classList.add('active');
+}
+function closeAddModal() { document.getElementById('addModal').classList.remove('active'); }
+
+async function saveKeyDate() {
+    var sel = document.getElementById('kdSymbol');
+    var opt = sel.options[sel.selectedIndex];
+    var symbol = sel.value;
+    var name = opt ? opt.getAttribute('data-name') : '';
+    var eventType = document.getElementById('kdType').value;
+    var date = document.getElementById('kdDate').value;
+    var note = document.getElementById('kdNote').value.trim();
+    var pushToCalendar = document.getElementById('kdPushCal').checked;
+    if (!symbol) { alert('Add a stock to your portfolio first.'); return; }
+    if (!date) { alert('Pick a date.'); return; }
+    try {
+        allKeyDates = await gasRun('addKeyDateFromClient', { symbol: symbol, name: name, eventType: eventType, date: date, note: note, source: 'manual', pushToCalendar: pushToCalendar });
+        closeAddModal();
+        render();
+    } catch(e) { alert('Failed to add: ' + e.message); }
+}
+
+async function deleteKeyDate(idx) {
+    var k = allKeyDates[idx];
+    if (!confirm('Remove ' + TYPE_LABELS[k.eventType] + ' date for ' + (k.name||k.symbol) + '?')) return;
+    try {
+        allKeyDates = await gasRun('deleteKeyDateFromClient', idx);
+        render();
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+async function pushToCalendar(idx) {
+    try {
+        allKeyDates = await gasRun('pushKeyDateToCalendarFromClient', idx);
+        render();
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+async function refreshFromPortfolio() {
+    var btn = document.getElementById('refreshBtn');
+    btn.textContent = 'Fetching...';
+    btn.disabled = true;
+    try {
+        allKeyDates = await gasRun('fetchKeyDatesForPortfolioFromClient');
+        render();
+        btn.textContent = 'Refreshed!';
+        setTimeout(function() { btn.innerHTML = '&#8635; Refresh from portfolio'; btn.disabled = false; }, 2000);
+    } catch(e) {
+        alert('Failed: ' + e.message);
+        btn.innerHTML = '&#8635; Refresh from portfolio';
+        btn.disabled = false;
+    }
+}
+
+function esc(s) { var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function fmtDate(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return String(dateStr);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+
+var _baseUrl = '';
+function initNav() {
+    gasRun('getDeploymentUrl').then(function(url) { _baseUrl = url; }).catch(function() { _baseUrl = ''; });
+}
+function navigate(page) {
+    var url = _baseUrl || window.top.location.href.split('?')[0];
+    window.top.location.href = url + '?page=' + page;
+}
+initNav();
+init();
+</script>
+</body>
+</html>
