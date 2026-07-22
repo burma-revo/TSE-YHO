@@ -1051,3 +1051,7 @@ function addKeyDateFromClient(item)               { return addKeyDate(item); }
 function deleteKeyDateFromClient(index)           { return deleteKeyDate(index); }
 function pushKeyDateToCalendarFromClient(index)   { return pushKeyDateToCalendar(index); }
 function fetchKeyDatesForPortfolioFromClient()    { return fetchKeyDatesForPortfolio(); }
+
+function clearYahooSession() {
+  CacheService.getScriptCache().remove("yf_session");
+}

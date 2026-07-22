@@ -17,7 +17,10 @@
         .card { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
         .card-title { font-size: 1.1rem; font-weight: bold; color: #0ABAB5; }
-        .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .header-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .view-toggle { display: flex; border: 1px solid #1a3a3a; border-radius: 8px; overflow: hidden; }
+        .view-toggle button { background: none; border: none; color: #7fb8b6; padding: 6px 14px; font-size: 0.82rem; cursor: pointer; font-weight: bold; }
+        .view-toggle button.active { background: #0ABAB5; color: #0a1a1a; }
         .add-btn, .refresh-btn { border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: bold; padding: 6px 14px; }
         .add-btn { background: rgba(10,186,181,0.15); color: #0ABAB5; border: 1px solid #0ABAB5; }
         .add-btn:hover { background: #0ABAB5; color: #0a1a1a; }
@@ -55,6 +58,33 @@
         .kd-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
         .kd-btn.del:hover { border-color: #ff5252; color: #ff5252; }
         .empty { color: #456a68; text-align: center; padding: 30px 0; font-size: 0.9rem; line-height: 1.7; }
+
+        .month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .month-nav-btn { background: none; border: 1px solid #1a3a3a; border-radius: 6px; color: #7fb8b6; cursor: pointer; padding: 6px 12px; font-size: 0.9rem; }
+        .month-nav-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .month-label { font-size: 1rem; font-weight: bold; color: #8fd4d1; text-align: center; }
+        .month-today-btn { font-size: 0.75rem; color: #456a68; background: none; border: none; cursor: pointer; text-decoration: underline; display: block; margin: 2px auto 0; }
+        .month-today-btn:hover { color: #0ABAB5; }
+        .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .month-dow { text-align: center; font-size: 0.7rem; color: #456a68; padding-bottom: 6px; font-weight: bold; }
+        .month-cell { min-height: 64px; background: #0a1a1a; border: 1px solid #163030; border-radius: 6px; padding: 4px; cursor: pointer; transition: border-color 0.15s; display: flex; flex-direction: column; }
+        .month-cell:hover { border-color: #1a4a4a; }
+        .month-cell.other-month { opacity: 0.35; }
+        .month-cell.today { border-color: #0ABAB5; background: rgba(10,186,181,0.06); }
+        .month-cell.selected { border-color: #0ABAB5; background: rgba(10,186,181,0.15); }
+        .month-daynum { font-size: 0.75rem; color: #7fb8b6; margin-bottom: 3px; }
+        .month-cell.today .month-daynum { color: #0ABAB5; font-weight: bold; }
+        .month-dots { display: flex; flex-wrap: wrap; gap: 2px; }
+        .month-dot { width: 6px; height: 6px; border-radius: 50%; }
+        .dot-earnings { background: #0ABAB5; }
+        .dot-dividend, .dot-exdividend { background: #f0a030; }
+        .dot-yutai { background: #d78ee8; }
+        .dot-custom { background: #8fd4d1; }
+        .month-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; font-size: 0.75rem; color: #7fb8b6; }
+        .month-legend span { display: flex; align-items: center; gap: 5px; }
+        .day-detail-card { margin-top: 16px; padding-top: 16px; border-top: 1px solid #163030; }
+        .day-detail-title { font-size: 0.9rem; font-weight: bold; color: #8fd4d1; margin-bottom: 10px; }
+
         .modal-overlay { display: none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
         .modal-overlay.active { display: flex; }
         .modal { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 24px; width: 100%; max-width: 420px; }
@@ -73,6 +103,8 @@
         @media (max-width: 600px) {
             .kd-row { grid-template-columns: 1fr; }
             .kd-right { align-items: flex-start; }
+            .month-cell { min-height: 46px; }
+            .month-daynum { font-size: 0.68rem; }
         }
     </style>
 </head>
@@ -92,12 +124,41 @@
         <div class="card-header">
             <div class="card-title">Key Dates</div>
             <div class="header-actions">
-                <button class="refresh-btn" id="refreshBtn" onclick="refreshFromPortfolio()">&#8635; Refresh from portfolio</button>
+                <div class="view-toggle">
+                    <button id="viewListBtn" class="active" onclick="setView('list')">List</button>
+                    <button id="viewMonthBtn" onclick="setView('month')">Month</button>
+                </div>
+                <button class="refresh-btn" id="refreshBtn" onclick="refreshFromPortfolio()">&#8635; Refresh</button>
                 <button class="add-btn" onclick="openAddModal()">+ Add date</button>
             </div>
         </div>
-        <div class="filter-row" id="filterRow"></div>
-        <div class="rows" id="kdRows"><div class="empty">Loading...</div></div>
+
+        <div id="listView">
+            <div class="filter-row" id="filterRow"></div>
+            <div class="rows" id="kdRows"><div class="empty">Loading...</div></div>
+        </div>
+
+        <div id="monthView" style="display:none;">
+            <div class="month-nav">
+                <button class="month-nav-btn" onclick="shiftMonth(-1)">&#8249;</button>
+                <div>
+                    <div class="month-label" id="monthLabel">--</div>
+                    <button class="month-today-btn" onclick="goToday()">Today</button>
+                </div>
+                <button class="month-nav-btn" onclick="shiftMonth(1)">&#8250;</button>
+            </div>
+            <div class="month-grid" id="monthGrid"></div>
+            <div class="month-legend">
+                <span><div class="month-dot dot-earnings"></div>Earnings</span>
+                <span><div class="month-dot dot-dividend"></div>Dividend</span>
+                <span><div class="month-dot dot-yutai"></div>&#20778;&#24575;</span>
+                <span><div class="month-dot dot-custom"></div>Custom</span>
+            </div>
+            <div class="day-detail-card" id="dayDetailCard" style="display:none;">
+                <div class="day-detail-title" id="dayDetailTitle"></div>
+                <div id="dayDetailRows"></div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -114,7 +175,7 @@
                 <option value="earnings">Earnings</option>
                 <option value="dividend">Dividend</option>
                 <option value="exdividend">Ex-Dividend</option>
-                <option value="yutai">Yutai (\u512A\u5F85)</option>
+                <option value="yutai">Yutai (&#20778;&#24575;)</option>
                 <option value="custom">Custom</option>
             </select>
         </div>
@@ -149,6 +210,9 @@ function gasRun(fnName) {
 var allKeyDates = [];
 var portfolio = [];
 var currentFilter = 'all';
+var currentView = 'list';
+var monthCursor = new Date(); monthCursor.setDate(1);
+var selectedDay = null;
 
 var TYPE_LABELS = { earnings: 'Earnings', dividend: 'Dividend', exdividend: 'Ex-Dividend', yutai: '\u512A\u5F85', custom: 'Custom' };
 
@@ -161,10 +225,23 @@ async function init() {
         allKeyDates = results[0];
         portfolio = results[1];
         populateSymbolSelect();
-        render();
+        renderAll();
     } catch(e) {
         document.getElementById('kdRows').innerHTML = '<div class="empty">Could not load: ' + e.message + '</div>';
     }
+}
+
+function renderAll() {
+    if (currentView === 'list') { render(); } else { renderMonth(); }
+}
+
+function setView(view) {
+    currentView = view;
+    document.getElementById('viewListBtn').classList.toggle('active', view === 'list');
+    document.getElementById('viewMonthBtn').classList.toggle('active', view === 'month');
+    document.getElementById('listView').style.display = view === 'list' ? 'block' : 'none';
+    document.getElementById('monthView').style.display = view === 'month' ? 'block' : 'none';
+    renderAll();
 }
 
 function populateSymbolSelect() {
@@ -205,7 +282,7 @@ function render() {
     buildFilters();
     var el = document.getElementById('kdRows');
     if (allKeyDates.length === 0) {
-        el.innerHTML = '<div class="empty">No key dates yet.<br>Click "+ Add date" or "Refresh from portfolio" to auto-fetch earnings &amp; dividend dates.</div>';
+        el.innerHTML = '<div class="empty">No key dates yet.<br>Click "+ Add date" or "Refresh" to auto-fetch earnings &amp; dividend dates.</div>';
         return;
     }
     var items = allKeyDates.filter(function(k) { return currentFilter === 'all' || k.eventType === currentFilter; });
@@ -214,36 +291,122 @@ function render() {
         return;
     }
     items = items.slice().sort(function(a,b) { return a.date < b.date ? -1 : 1; });
-
-    var html = '';
-    items.forEach(function(k) {
-        var idx = allKeyDates.indexOf(k);
-        var du = daysUntil(k.date);
-        var cdClass = du < 0 ? 'past' : du === 0 ? 'today' : du <= 7 ? 'soon' : '';
-        var cdText = du < 0 ? (Math.abs(du) + 'd ago') : du === 0 ? 'Today' : ('in ' + du + 'd');
-        var sourceTag = k.source === 'auto' ? '<span class="kd-source-auto">&#9889; auto</span>' : '';
-        var calBtn = k.calendarEventId
-            ? '<span class="kd-btn" style="cursor:default;">&#10003; on cal</span>'
-            : '<button class="kd-btn" data-cal="' + idx + '">+ cal</button>';
-        html += '<div class="kd-row">'
-              + '<div class="kd-badge ' + k.eventType + '">' + TYPE_LABELS[k.eventType] + '</div>'
-              + '<div class="kd-mid">'
-              +   '<div class="kd-name">' + esc(k.name || k.symbol) + ' <span style="color:#456a68;font-weight:normal;">(' + esc(k.symbol) + ')</span></div>'
-              +   '<div class="kd-meta">' + sourceTag + '</div>'
-              +   (k.note ? '<div class="kd-note">' + esc(k.note) + '</div>' : '')
-              + '</div>'
-              + '<div class="kd-right">'
-              +   '<div class="kd-date">' + fmtDate(k.date) + '</div>'
-              +   '<div class="kd-countdown ' + cdClass + '">' + cdText + '</div>'
-              +   '<div class="kd-actions">' + calBtn + '<button class="kd-btn del" data-del="' + idx + '">del</button></div>'
-              + '</div>'
-              + '</div>';
-    });
-    el.innerHTML = html;
+    el.innerHTML = items.map(renderKdRow).join('');
     el.querySelectorAll('[data-del]').forEach(function(btn) {
         btn.addEventListener('click', function() { deleteKeyDate(parseInt(btn.getAttribute('data-del'))); });
     });
     el.querySelectorAll('[data-cal]').forEach(function(btn) {
+        btn.addEventListener('click', function() { pushToCalendar(parseInt(btn.getAttribute('data-cal'))); });
+    });
+}
+
+function renderKdRow(k) {
+    var idx = allKeyDates.indexOf(k);
+    var du = daysUntil(k.date);
+    var cdClass = du < 0 ? 'past' : du === 0 ? 'today' : du <= 7 ? 'soon' : '';
+    var cdText = du < 0 ? (Math.abs(du) + 'd ago') : du === 0 ? 'Today' : ('in ' + du + 'd');
+    var sourceTag = k.source === 'auto' ? '<span class="kd-source-auto">&#9889; auto</span>' : '';
+    var calBtn = k.calendarEventId
+        ? '<span class="kd-btn" style="cursor:default;">&#10003; on cal</span>'
+        : '<button class="kd-btn" data-cal="' + idx + '">+ cal</button>';
+    return '<div class="kd-row">'
+          + '<div class="kd-badge ' + k.eventType + '">' + TYPE_LABELS[k.eventType] + '</div>'
+          + '<div class="kd-mid">'
+          +   '<div class="kd-name">' + esc(k.name || k.symbol) + ' <span style="color:#456a68;font-weight:normal;">(' + esc(k.symbol) + ')</span></div>'
+          +   '<div class="kd-meta">' + sourceTag + '</div>'
+          +   (k.note ? '<div class="kd-note">' + esc(k.note) + '</div>' : '')
+          + '</div>'
+          + '<div class="kd-right">'
+          +   '<div class="kd-date">' + fmtDateLong(k.date) + '</div>'
+          +   '<div class="kd-countdown ' + cdClass + '">' + cdText + '</div>'
+          +   '<div class="kd-actions">' + calBtn + '<button class="kd-btn del" data-del="' + idx + '">del</button></div>'
+          + '</div>'
+          + '</div>';
+}
+
+function shiftMonth(delta) {
+    monthCursor.setMonth(monthCursor.getMonth() + delta);
+    selectedDay = null;
+    renderMonth();
+}
+function goToday() {
+    monthCursor = new Date(); monthCursor.setDate(1);
+    selectedDay = fmtISO(new Date());
+    renderMonth();
+}
+
+function fmtISO(d) {
+    var y = d.getFullYear(), m = ('0'+(d.getMonth()+1)).slice(-2), dd = ('0'+d.getDate()).slice(-2);
+    return y + '-' + m + '-' + dd;
+}
+
+function renderMonth() {
+    var year = monthCursor.getFullYear(), month = monthCursor.getMonth();
+    var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('monthLabel').textContent = monthNames[month] + ' ' + year;
+
+    var eventsByDay = {};
+    allKeyDates.forEach(function(k) {
+        if (!eventsByDay[k.date]) eventsByDay[k.date] = [];
+        eventsByDay[k.date].push(k);
+    });
+
+    var firstOfMonth = new Date(year, month, 1);
+    var startDow = firstOfMonth.getDay();
+    var gridStart = new Date(year, month, 1 - startDow);
+    var todayStr = fmtISO(new Date());
+
+    var dowLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var html = dowLabels.map(function(d) { return '<div class="month-dow">' + d + '</div>'; }).join('');
+
+    for (var i = 0; i < 42; i++) {
+        var cellDate = new Date(gridStart); cellDate.setDate(gridStart.getDate() + i);
+        var iso = fmtISO(cellDate);
+        var isOtherMonth = cellDate.getMonth() !== month;
+        var isToday = iso === todayStr;
+        var isSelected = iso === selectedDay;
+        var dayEvents = eventsByDay[iso] || [];
+        var dotsHtml = dayEvents.slice(0, 6).map(function(e) {
+            return '<div class="month-dot dot-' + e.eventType + '"></div>';
+        }).join('');
+
+        var cls = 'month-cell' + (isOtherMonth ? ' other-month' : '') + (isToday ? ' today' : '') + (isSelected ? ' selected' : '');
+        html += '<div class="' + cls + '" data-date="' + iso + '">'
+              +   '<div class="month-daynum">' + cellDate.getDate() + '</div>'
+              +   '<div class="month-dots">' + dotsHtml + '</div>'
+              + '</div>';
+
+        if (i >= 34 && cellDate.getMonth() !== month && (i+1) % 7 === 0) break;
+    }
+
+    var gridEl = document.getElementById('monthGrid');
+    gridEl.innerHTML = html;
+    gridEl.querySelectorAll('.month-cell').forEach(function(cell) {
+        cell.addEventListener('click', function() {
+            selectedDay = cell.getAttribute('data-date');
+            renderMonth();
+        });
+    });
+
+    renderDayDetail(eventsByDay);
+}
+
+function renderDayDetail(eventsByDay) {
+    var card = document.getElementById('dayDetailCard');
+    if (!selectedDay) { card.style.display = 'none'; return; }
+    var events = eventsByDay[selectedDay] || [];
+    card.style.display = 'block';
+    document.getElementById('dayDetailTitle').textContent = fmtDateLong(selectedDay) + ' (' + events.length + ')';
+    var rowsEl = document.getElementById('dayDetailRows');
+    if (events.length === 0) {
+        rowsEl.innerHTML = '<div class="empty" style="padding:14px 0;">No key dates on this day.</div>';
+        return;
+    }
+    rowsEl.innerHTML = events.map(renderKdRow).join('');
+    rowsEl.querySelectorAll('[data-del]').forEach(function(btn) {
+        btn.addEventListener('click', function() { deleteKeyDate(parseInt(btn.getAttribute('data-del'))); });
+    });
+    rowsEl.querySelectorAll('[data-cal]').forEach(function(btn) {
         btn.addEventListener('click', function() { pushToCalendar(parseInt(btn.getAttribute('data-cal'))); });
     });
 }
@@ -271,7 +434,7 @@ async function saveKeyDate() {
     try {
         allKeyDates = await gasRun('addKeyDateFromClient', { symbol: symbol, name: name, eventType: eventType, date: date, note: note, source: 'manual', pushToCalendar: pushToCalendar });
         closeAddModal();
-        render();
+        renderAll();
     } catch(e) { alert('Failed to add: ' + e.message); }
 }
 
@@ -280,14 +443,14 @@ async function deleteKeyDate(idx) {
     if (!confirm('Remove ' + TYPE_LABELS[k.eventType] + ' date for ' + (k.name||k.symbol) + '?')) return;
     try {
         allKeyDates = await gasRun('deleteKeyDateFromClient', idx);
-        render();
+        renderAll();
     } catch(e) { alert('Failed: ' + e.message); }
 }
 
 async function pushToCalendar(idx) {
     try {
         allKeyDates = await gasRun('pushKeyDateToCalendarFromClient', idx);
-        render();
+        renderAll();
     } catch(e) { alert('Failed: ' + e.message); }
 }
 
@@ -297,18 +460,18 @@ async function refreshFromPortfolio() {
     btn.disabled = true;
     try {
         allKeyDates = await gasRun('fetchKeyDatesForPortfolioFromClient');
-        render();
+        renderAll();
         btn.textContent = 'Refreshed!';
-        setTimeout(function() { btn.innerHTML = '&#8635; Refresh from portfolio'; btn.disabled = false; }, 2000);
+        setTimeout(function() { btn.innerHTML = '&#8635; Refresh'; btn.disabled = false; }, 2000);
     } catch(e) {
         alert('Failed: ' + e.message);
-        btn.innerHTML = '&#8635; Refresh from portfolio';
+        btn.innerHTML = '&#8635; Refresh';
         btn.disabled = false;
     }
 }
 
 function esc(s) { var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
-function fmtDate(dateStr) {
+function fmtDateLong(dateStr) {
     if (!dateStr) return '';
     var d = new Date(dateStr + 'T00:00:00');
     if (isNaN(d.getTime())) return String(dateStr);
