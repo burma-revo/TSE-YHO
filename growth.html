@@ -63,6 +63,8 @@
         <div class="stat-item"><div class="stat-label">Total Invested</div><div class="stat-value" id="statInvested">--</div></div>
         <div class="stat-item"><div class="stat-label">Unrealized P&amp;L</div><div class="stat-value" id="statPL">--</div></div>
         <div class="stat-item"><div class="stat-label">All-time High</div><div class="stat-value" style="color:#f0a030" id="statATH">--</div></div>
+        <div class="stat-item"><div class="stat-label">Days Since ATH</div><div class="stat-value" id="statDaysSinceATH">--</div></div>
+        <div class="stat-item"><div class="stat-label">Max Drawdown</div><div class="stat-value" style="color:#ff5252" id="statMaxDD">--</div></div>
     </div>
 
     <div class="card">
@@ -165,6 +167,20 @@ function renderChart(days) {
         document.getElementById('statATH').textContent      = '\u00A5' + fmt(ath);
         document.getElementById('statPL').textContent       = plSign + '\u00A5' + fmt(Math.abs(pl)) + ' (' + plSign + plPct.toFixed(1) + '%)';
         document.getElementById('statPL').className         = 'stat-value ' + plClass;
+
+        // Drawdown stats: walk the snapshot history tracking the running
+        // peak, and record the largest peak-to-trough % drop seen so far.
+        var runningPeak = -Infinity, peakDate = allSnapshots[0].date, maxDrawdownPct = 0;
+        allSnapshots.forEach(function(r) {
+            if (r.value > runningPeak) { runningPeak = r.value; peakDate = r.date; }
+            if (runningPeak > 0) {
+                var ddPct = ((runningPeak - r.value) / runningPeak) * 100;
+                if (ddPct > maxDrawdownPct) maxDrawdownPct = ddPct;
+            }
+        });
+        var daysSinceATH = Math.round((new Date(last.date + 'T00:00:00') - new Date(peakDate + 'T00:00:00')) / 86400000);
+        document.getElementById('statDaysSinceATH').textContent = daysSinceATH === 0 ? 'At ATH' : (daysSinceATH + 'd');
+        document.getElementById('statMaxDD').textContent        = '-' + maxDrawdownPct.toFixed(1) + '%';
     }
 
     if (data.length === 0) {

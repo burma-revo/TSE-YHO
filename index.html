@@ -83,7 +83,12 @@
         .portfolio-stock-name { font-weight: bold; color: #fff; cursor: pointer; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .portfolio-stock-name:hover { color: #0ABAB5; }
         .portfolio-stock-detail { color: #7fb8b6; font-size: 0.8rem; margin-top: 2px; }
-        .sector-badge { font-size: 0.68rem; background: #163030; color: #8fd4d1; padding: 2px 8px; border-radius: 10px; }
+        .tag-pill { display: inline-block; font-size: 0.65rem; font-weight: bold; padding: 2px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+        .tag-long { background: rgba(10,186,181,0.15); color: #0ABAB5; }
+        .tag-swing { background: rgba(240,160,48,0.15); color: #f0a030; }
+        .tag-dividend { background: rgba(120,180,255,0.15); color: #78b4ff; }
+        .tag-speculative { background: rgba(255,82,82,0.15); color: #ff5252; }
+        .concentration-banner { background: rgba(240,160,48,0.1); border: 1px solid rgba(240,160,48,0.35); border-radius: 8px; padding: 10px 14px; margin-top: 12px; font-size: 0.82rem; color: #f0a030; display: none; }
         .portfolio-position { text-align: right; font-size: 0.85rem; color: #8fd4d1; white-space: nowrap; }
         .portfolio-current { text-align: right; font-size: 0.85rem; color: #fff; white-space: nowrap; }
         .portfolio-current .current-label { color: #456a68; font-size: 0.75rem; }
@@ -176,14 +181,12 @@
     <div class="portfolio-section" id="portfolioSection">
         <div class="portfolio-header">
             <div class="portfolio-title">My Portfolio</div>
-            <div style="display:flex;align-items:center;gap:10px;">
-                <div class="portfolio-total-pl" id="portfolioTotalPl"></div>
-                <button class="add-portfolio-btn" id="refreshSectorsBtn" onclick="refreshSectors()" style="font-size:0.75rem;padding:4px 10px;">Refresh sectors</button>
-            </div>
+            <div class="portfolio-total-pl" id="portfolioTotalPl"></div>
         </div>
         <div id="portfolioRows" class="portfolio-rows"></div>
         <div id="allocationChart" style="display:none;">
             <div class="treemap-grid" id="treemapGrid"></div>
+            <div class="concentration-banner" id="concentrationBanner"></div>
         </div>
         <div class="portfolio-summary" id="portfolioSummary" style="display:none;"></div>
     </div>
@@ -226,8 +229,14 @@
             </select>
         </div>
         <div class="modal-field">
-            <label>Sector (optional)</label>
-            <input type="text" id="modalSector" placeholder="auto-detected if left blank">
+            <label>Tag</label>
+            <select id="modalTag">
+                <option value="">No tag</option>
+                <option value="long">Long-term hold</option>
+                <option value="swing">Swing trade</option>
+                <option value="dividend">Dividend play</option>
+                <option value="speculative">Speculative</option>
+            </select>
         </div>
         <div class="modal-field">
             <label>Notes (optional)</label>
@@ -291,13 +300,12 @@ async function fetchYahoo(url) {
     if (typeof raw === 'string') return JSON.parse(raw);
     return raw;
 }
-async function gasListPositions()        { return gasRun('getAllPositions'); }
-async function gasAddPosition(pos)       { return gasRun('addPositionFromClient', pos); }
-async function gasEditPosition(id, pos)  { return gasRun('editPositionFromClient', id, pos); }
-async function gasDeletePosition(id)     { return gasRun('deletePositionFromClient', id); }
-async function gasSellPosition(id, data) { return gasRun('sellPositionFromClient', id, data); }
-async function gasGetSales()             { return gasRun('getAllSales'); }
-async function gasRefreshSectors()       { return gasRun('fetchSectorsForPortfolioFromClient'); }
+async function gasListPositions()           { return gasRun('getAllPositions'); }
+async function gasAddPosition(pos)          { return gasRun('addPositionFromClient', pos); }
+async function gasEditPosition(index, pos)  { return gasRun('editPositionFromClient', index, pos); }
+async function gasDeletePosition(index)     { return gasRun('deletePositionFromClient', index); }
+async function gasSellPosition(index, data) { return gasRun('sellPositionFromClient', index, data); }
+async function gasGetSales()                { return gasRun('getAllSales'); }
 
 // Search
 document.getElementById('searchInput').addEventListener('keydown', function(e) {
@@ -597,7 +605,7 @@ async function renderPortfolio() {
     var prices   = portfolio.map(function(p) { return priceMap[p.symbol] || null; });
 
     var totalInvested = 0, totalCurrent = 0, allPricesLoaded = true;
-    var chartLabels = [], chartValues = [], chartPlPcts = [];
+    var chartLabels = [], chartValues = [], chartPlPcts = [], chartSymbols = [];
     var html = '';
 
     portfolio.forEach(function(pos, i) {
@@ -614,6 +622,7 @@ async function renderPortfolio() {
             chartLabels.push(pos.name);
             chartValues.push(currentVal);
             chartPlPcts.push(plPct);
+            chartSymbols.push(pos.symbol);
         } else {
             allPricesLoaded = false;
             totalCurrent   += invested;
@@ -623,13 +632,13 @@ async function renderPortfolio() {
             ? '<div class="pl-value ' + plClass + '">' + (pl >= 0 ? '+' : '') + '\u00A5' + formatNum(Math.abs(pl)) + '</div>'
             + '<div class="pl-pct '   + plClass + '">(' + (pl >= 0 ? '+' : '') + plPct.toFixed(1) + '%)</div>'
             : '<span style="color:#456a68">--</span>';
-        var sectorHtml = pos.sector ? '<span class="sector-badge">' + esc(pos.sector) + '</span>' : '';
 
+        var tagHtml = pos.tag ? renderTagPill(pos.tag) : '';
         html +=
             '<div class="portfolio-row">'
           + '<div class="portfolio-stock-info">'
-          +   '<div class="portfolio-stock-name" data-code="' + pos.symbol.replace('.T', '') + '">' + esc(pos.name) + '</div>'
-          +   '<div class="portfolio-stock-detail">' + esc(pos.symbol) + (pos.notes ? ' - ' + esc(pos.notes) : '') + ' ' + sectorHtml + '</div>'
+          +   '<div class="portfolio-stock-name" data-code="' + pos.symbol.replace('.T', '') + '">' + esc(pos.name) + tagHtml + '</div>'
+          +   '<div class="portfolio-stock-detail">' + esc(pos.symbol) + (pos.notes ? ' - ' + esc(pos.notes) : '') + '</div>'
           + '</div>'
           + '<div class="portfolio-position">' + pos.shares + ' shares @ \u00A5' + formatNum(pos.buyPrice)
           +   '<br><span style="color:#456a68;font-size:0.75rem;">' + buyDateFmt + '</span></div>'
@@ -638,9 +647,9 @@ async function renderPortfolio() {
           + '</div>'
           + '<div class="portfolio-pl">' + plHtml
           +   '<div class="portfolio-actions">'
-          +     '<button class="portfolio-btn sell" data-idx="' + esc(pos.id) + '">sell</button>'
-          +     '<button class="portfolio-btn" data-edit="' + esc(pos.id) + '">edit</button>'
-          +     '<button class="portfolio-btn delete" data-del="' + esc(pos.id) + '">del</button>'
+          +     '<button class="portfolio-btn sell" data-idx="' + i + '">sell</button>'
+          +     '<button class="portfolio-btn" data-edit="' + i + '">edit</button>'
+          +     '<button class="portfolio-btn delete" data-del="' + i + '">del</button>'
           +   '</div>'
           + '</div>'
           + '</div>';
@@ -651,13 +660,13 @@ async function renderPortfolio() {
         el.addEventListener('click', function() { quickSearch(el.dataset.code); });
     });
     rowsEl.querySelectorAll('[data-idx]').forEach(function(btn) {
-        btn.addEventListener('click', function() { openSellModal(btn.dataset.idx); });
+        btn.addEventListener('click', function() { openSellModal(parseInt(btn.dataset.idx)); });
     });
     rowsEl.querySelectorAll('[data-edit]').forEach(function(btn) {
-        btn.addEventListener('click', function() { openEditPosition(btn.dataset.edit); });
+        btn.addEventListener('click', function() { openEditPosition(parseInt(btn.dataset.edit)); });
     });
     rowsEl.querySelectorAll('[data-del]').forEach(function(btn) {
-        btn.addEventListener('click', function() { deletePos(btn.dataset.del); });
+        btn.addEventListener('click', function() { deletePos(parseInt(btn.dataset.del)); });
     });
 
     var totalPl    = totalCurrent - totalInvested;
@@ -709,6 +718,7 @@ async function renderPortfolio() {
                     + '</div>';
         });
         gridEl.innerHTML = tmHtml;
+        loadSectorConcentration(chartSymbols, chartValues, totalVal);
     } else {
         chartContainer.style.display = 'none';
     }
@@ -741,25 +751,24 @@ async function showRealizedDetail() {
 }
 
 // Modal: add / edit
-var modalMode = 'add', modalEditId = null, modalSymbol = '', modalName = '';
+var modalMode = 'add', modalEditIndex = -1, modalSymbol = '', modalName = '';
 function openAddToPortfolio(symbol, name, currentPrice) {
-    modalMode = 'add'; modalEditId = null; modalSymbol = symbol; modalName = name;
+    modalMode = 'add'; modalEditIndex = -1; modalSymbol = symbol; modalName = name;
     document.getElementById('modalTitle').textContent    = 'Add to Portfolio';
     document.getElementById('modalStock').value          = name + ' (' + symbol + ')';
     document.getElementById('modalBuyPrice').value       = currentPrice || '';
     document.getElementById('modalBuyDate').value        = new Date().toISOString().split('T')[0];
     document.getElementById('modalShares').value         = '100';
     document.getElementById('modalNotes').value          = '';
-    document.getElementById('modalSector').value         = '';
-    document.getElementById('modalSector').placeholder   = 'auto-detected if left blank';
+    document.getElementById('modalTag').value            = '';
     document.getElementById('modalSaveBtn').textContent  = 'Add';
     document.getElementById('portfolioModal').classList.add('active');
 }
-async function openEditPosition(id) {
+async function openEditPosition(index) {
     var portfolio = await gasListPositions();
-    var pos = portfolio.find(function(p) { return p.id === id; });
+    var pos = portfolio[index];
     if (!pos) return;
-    modalMode = 'edit'; modalEditId = pos.id; modalSymbol = pos.symbol; modalName = pos.name;
+    modalMode = 'edit'; modalEditIndex = index; modalSymbol = pos.symbol; modalName = pos.name;
     document.getElementById('modalTitle').textContent   = 'Edit Position';
     document.getElementById('modalStock').value         = pos.name + ' (' + pos.symbol + ')';
     document.getElementById('modalBuyPrice').value      = pos.buyPrice;
@@ -773,7 +782,7 @@ async function openEditPosition(id) {
     }
     sel.value = pos.shares;
     document.getElementById('modalNotes').value         = pos.notes || '';
-    document.getElementById('modalSector').value        = pos.sector || '';
+    document.getElementById('modalTag').value           = pos.tag || '';
     document.getElementById('modalSaveBtn').textContent = 'Update';
     document.getElementById('portfolioModal').classList.add('active');
 }
@@ -783,41 +792,34 @@ async function saveModalPosition() {
     var buyDate  = document.getElementById('modalBuyDate').value;
     var shares   = parseInt(document.getElementById('modalShares').value);
     var notes    = document.getElementById('modalNotes').value.trim();
-    var sector   = document.getElementById('modalSector').value.trim();
+    var tag      = document.getElementById('modalTag').value;
     if (!buyPrice || buyPrice <= 0) { alert('Please enter a valid buy price.'); return; }
     if (!shares   || shares   <= 0) { alert('Please select a valid number of shares.'); return; }
-    var pos = { symbol: modalSymbol, name: modalName, buyPrice: buyPrice, buyDate: buyDate, shares: shares, notes: notes, sector: sector };
+    var pos = { symbol: modalSymbol, name: modalName, buyPrice: buyPrice, buyDate: buyDate, shares: shares, notes: notes, tag: tag };
     try {
-        if (modalMode === 'add') { await gasAddPosition(pos); } else { await gasEditPosition(modalEditId, pos); }
+        if (modalMode === 'add') { await gasAddPosition(pos); } else { await gasEditPosition(modalEditIndex, pos); }
         closeModal(); renderPortfolio();
     } catch (err) { alert('Failed to save: ' + err.message); }
 }
-async function deletePos(id) {
+async function deletePos(index) {
     var portfolio = await gasListPositions();
-    var pos = portfolio.find(function(p) { return p.id === id; });
+    var pos = portfolio[index];
     if (!pos) return;
     if (!confirm('Remove ' + pos.name + ' (' + pos.shares + ' shares) from portfolio?')) return;
-    try { await gasDeletePosition(id); renderPortfolio(); }
+    try { await gasDeletePosition(index); renderPortfolio(); }
     catch (err) { alert('Failed to delete: ' + err.message); }
-}
-async function refreshSectors() {
-    var btn = document.getElementById('refreshSectorsBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Refreshing...'; }
-    try { await gasRefreshSectors(); renderPortfolio(); }
-    catch (err) { alert('Failed to refresh sectors: ' + err.message); }
-    finally { if (btn) { btn.disabled = false; btn.textContent = 'Refresh sectors'; } }
 }
 document.getElementById('portfolioModal').addEventListener('click', function(e) {
     if (e.target === this) closeModal();
 });
 
 // Modal: sell
-var sellId = null, sellBuyPrice = 0, sellMaxShares = 0;
-async function openSellModal(id) {
+var sellIndex = -1, sellBuyPrice = 0, sellMaxShares = 0;
+async function openSellModal(index) {
     var portfolio = await gasListPositions();
-    var pos = portfolio.find(function(p) { return p.id === id; });
+    var pos = portfolio[index];
     if (!pos) return;
-    sellId = pos.id; sellBuyPrice = pos.buyPrice; sellMaxShares = pos.shares;
+    sellIndex = index; sellBuyPrice = pos.buyPrice; sellMaxShares = pos.shares;
     document.getElementById('sellModalStock').value    = pos.name + ' (' + pos.symbol + ')';
     document.getElementById('sellModalBuyPrice').value = '\u00A5' + formatNum(pos.buyPrice);
     document.getElementById('sellModalSharesLabel').textContent = 'Shares to Sell (max ' + pos.shares + ')';
@@ -858,7 +860,7 @@ async function confirmSell() {
     var profit = (sellPrice - sellBuyPrice) * sellShares;
     if (!confirm('Sell ' + sellShares + ' shares @ \u00A5' + formatNum(sellPrice) + '?\nProfit: ' + (profit >= 0 ? '+' : '') + '\u00A5' + formatNum(Math.abs(profit)))) return;
     try {
-        await gasSellPosition(sellId, { sellPrice: sellPrice, sellDate: sellDate, sellShares: sellShares });
+        await gasSellPosition(sellIndex, { sellPrice: sellPrice, sellDate: sellDate, sellShares: sellShares });
         closeSellModal(); renderPortfolio();
     } catch (err) { alert('Failed to sell: ' + err.message); }
 }
@@ -882,6 +884,42 @@ function formatDateDisplay(dateStr) {
     if (isNaN(d.getTime())) return String(dateStr);
     return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
 }
+var TAG_LABELS = { long: 'Long-term hold', swing: 'Swing trade', dividend: 'Dividend play', speculative: 'Speculative' };
+function renderTagPill(tag) {
+    if (!TAG_LABELS[tag]) return '';
+    return '<span class="tag-pill tag-' + tag + '">' + TAG_LABELS[tag] + '</span>';
+}
+
+// Fetches sector for each portfolio symbol (cached server-side, 6h) and
+// warns if the portfolio is heavily concentrated in one sector.
+async function loadSectorConcentration(symbols, values, totalVal) {
+    var bannerEl = document.getElementById('concentrationBanner');
+    if (!symbols.length || totalVal <= 0) { bannerEl.style.display = 'none'; return; }
+    try {
+        var sectorMap = await gasRun('getPortfolioSectorsFromClient', symbols);
+        var bySector = {};
+        symbols.forEach(function(sym, i) {
+            var sector = sectorMap[sym] || 'Unknown';
+            bySector[sector] = (bySector[sector] || 0) + values[i];
+        });
+        var top = null;
+        Object.keys(bySector).forEach(function(sector) {
+            if (sector === 'Unknown') return; // don't warn on missing data
+            if (!top || bySector[sector] > bySector[top]) top = sector;
+        });
+        if (!top) { bannerEl.style.display = 'none'; return; }
+        var pct = (bySector[top] / totalVal) * 100;
+        if (pct >= 40) {
+            bannerEl.style.display = 'block';
+            bannerEl.innerHTML = '&#9888;&#65039; ' + pct.toFixed(0) + '% of your portfolio is concentrated in <strong>' + esc(top) + '</strong>. Consider diversifying.';
+        } else {
+            bannerEl.style.display = 'none';
+        }
+    } catch (e) {
+        bannerEl.style.display = 'none';
+    }
+}
+
 function hideAll() { hide('loading'); hide('error'); hide('stockCard'); hide('multiResults'); }
 function show(id)  { document.getElementById(id).style.display = 'block'; }
 function hide(id)  { document.getElementById(id).style.display = 'none'; }
