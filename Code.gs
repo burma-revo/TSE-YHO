@@ -47,15 +47,15 @@ function doGet(e) {
       return jsonOk(getAllPositions());
     }
     if (action === "edit") {
-      editPosition(parseInt(e.parameter.index, 10), JSON.parse(e.parameter.data));
+      editPosition(e.parameter.id, JSON.parse(e.parameter.data));
       return jsonOk(getAllPositions());
     }
     if (action === "delete") {
-      deletePosition(parseInt(e.parameter.index, 10));
+      deletePosition(e.parameter.id);
       return jsonOk(getAllPositions());
     }
     if (action === "sell") {
-      sellPosition(parseInt(e.parameter.index, 10), JSON.parse(e.parameter.data));
+      sellPosition(e.parameter.id, JSON.parse(e.parameter.data));
       return jsonOk(getAllPositions());
     }
     return jsonErr("Unknown action: " + action);
@@ -199,18 +199,54 @@ function fetchAllPrices(symbols) {
 
 // ─── Sheet helpers ────────────────────────────────────────────
 
+// Column layout: symbol, name, buyPrice, buyDate, shares, notes, buyCount, sector, id, tag
+// "sector"/"id"/"tag" were added later; ensurePortfolioSchema() migrates older
+// sheets in place (adds headers + backfills a stable id per row) so that
+// edit/delete/sell no longer depend on positional row index from the client.
+// "tag" is a free-text user categorization (long/swing/dividend/speculative),
+// distinct from "sector" which is auto-fetched from Yahoo.
+var PORTFOLIO_HEADERS = ["symbol","name","buyPrice","buyDate","shares","notes","buyCount","sector","id","tag"];
+var PORTFOLIO_ID_COL  = PORTFOLIO_HEADERS.indexOf("id") + 1;
+var PORTFOLIO_TAG_COL = PORTFOLIO_HEADERS.indexOf("tag") + 1;
+
 function getSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Sheet1") || ss.getSheets()[0];
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["symbol","name","buyPrice","buyDate","shares","notes","buyCount","tag"]);
-  } else {
-    // Migration: older sheets were created before the "tag" column existed.
-    // Add the header if column 8 isn't already labeled "tag".
-    var header = sheet.getRange(1, 8).getValue();
-    if (header !== "tag") sheet.getRange(1, 8).setValue("tag");
+    sheet.appendRow(PORTFOLIO_HEADERS);
   }
+  ensurePortfolioSchema(sheet);
   return sheet;
+}
+
+function ensurePortfolioSchema(sheet) {
+  var lastCol = Math.max(sheet.getLastColumn(), PORTFOLIO_HEADERS.length);
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var changed = false;
+  PORTFOLIO_HEADERS.forEach(function(h, i) {
+    if (headers[i] !== h) { sheet.getRange(1, i + 1).setValue(h); changed = true; }
+  });
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    var ids = sheet.getRange(2, PORTFOLIO_ID_COL, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (!ids[i][0]) sheet.getRange(2 + i, PORTFOLIO_ID_COL).setValue(Utilities.getUuid());
+    }
+  }
+  return changed;
+}
+
+// Finds the sheet row for a stable position id. Row order can change
+// (manual sort, deletes) so callers must never rely on array index.
+function findRowById(sheet, id) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1 || !id) return -1;
+  var ids = sheet.getRange(2, PORTFOLIO_ID_COL, lastRow - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (ids[i][0] === id) return i + 2;
+  }
+  return -1;
 }
 
 function getSalesSheet() {
@@ -230,7 +266,7 @@ function getAllPositions() {
   var sheet = getSheet();
   var lastRow = sheet.getLastRow();
   if (lastRow <= 1) return [];
-  return sheet.getRange(2, 1, lastRow - 1, 8).getValues().map(function(row) {
+  return sheet.getRange(2, 1, lastRow - 1, 10).getValues().map(function(row) {
     return {
       symbol:   row[0] || "",
       name:     row[1] || "",
@@ -239,32 +275,38 @@ function getAllPositions() {
       shares:   Number(row[4]) || 0,
       notes:    row[5] || "",
       buyCount: Number(row[6]) || 1,
-      tag:      row[7] || ""
+      sector:   row[7] || "",
+      id:       row[8] || "",
+      tag:      row[9] || ""
     };
   });
 }
 
 function addPosition(pos) {
+  var sector = pos.sector || getSector(pos.symbol) || "";
   getSheet().appendRow([
     pos.symbol || "", pos.name || "", pos.buyPrice || 0,
-    pos.buyDate || "", pos.shares || 0, pos.notes || "", pos.buyCount || 1, pos.tag || ""
+    pos.buyDate || "", pos.shares || 0, pos.notes || "", pos.buyCount || 1,
+    sector, Utilities.getUuid(), pos.tag || ""
   ]);
 }
 
-function editPosition(index, pos) {
+function editPosition(id, pos) {
   var sheet = getSheet();
-  var row = index + 2;
-  if (row < 2 || row > sheet.getLastRow()) throw new Error("Invalid index: " + index);
+  var row = findRowById(sheet, id);
+  if (row === -1) throw new Error("Position not found: " + id);
   sheet.getRange(row, 1, 1, 8).setValues([[
     pos.symbol || "", pos.name || "", pos.buyPrice || 0,
-    pos.buyDate || "", pos.shares || 0, pos.notes || "", pos.buyCount || 1, pos.tag || ""
+    pos.buyDate || "", pos.shares || 0, pos.notes || "", pos.buyCount || 1,
+    pos.sector || ""
   ]]);
+  sheet.getRange(row, PORTFOLIO_TAG_COL).setValue(pos.tag || "");
 }
 
-function deletePosition(index) {
+function deletePosition(id) {
   var sheet = getSheet();
-  var row = index + 2;
-  if (row < 2 || row > sheet.getLastRow()) throw new Error("Invalid index: " + index);
+  var row = findRowById(sheet, id);
+  if (row === -1) throw new Error("Position not found: " + id);
   sheet.deleteRow(row);
 }
 
@@ -286,10 +328,10 @@ function getAllSales() {
   });
 }
 
-function sellPosition(index, sellData) {
+function sellPosition(id, sellData) {
   var sheet = getSheet();
-  var row = index + 2;
-  if (row < 2 || row > sheet.getLastRow()) throw new Error("Invalid index: " + index);
+  var row = findRowById(sheet, id);
+  if (row === -1) throw new Error("Position not found: " + id);
 
   var values        = sheet.getRange(row, 1, 1, 6).getValues()[0];
   var symbol        = values[0];
@@ -320,24 +362,24 @@ function sellPosition(index, sellData) {
 
 function addPositionFromClient(pos) {
   var existing = getAllPositions();
-  var idx = -1;
+  var match = null;
   for (var i = 0; i < existing.length; i++) {
-    if (existing[i].symbol === pos.symbol) { idx = i; break; }
+    if (existing[i].symbol === pos.symbol) { match = existing[i]; break; }
   }
-  if (idx !== -1) {
-    var e = existing[idx];
-    var oldShares = Number(e.shares), oldPrice = Number(e.buyPrice);
+  if (match) {
+    var oldShares = Number(match.shares), oldPrice = Number(match.buyPrice);
     var newShares = Number(pos.shares), newPrice = Number(pos.buyPrice);
     var total = oldShares + newShares;
-    editPosition(idx, {
-      symbol:   e.symbol,
-      name:     e.name,
+    editPosition(match.id, {
+      symbol:   match.symbol,
+      name:     match.name,
       buyPrice: Math.round((oldShares * oldPrice + newShares * newPrice) / total * 10) / 10,
       buyDate:  pos.buyDate,
       shares:   total,
       notes:    pos.notes,
-      buyCount: (Number(e.buyCount) || 1) + 1,
-      tag:      pos.tag || e.tag || ""
+      buyCount: (Number(match.buyCount) || 1) + 1,
+      sector:   match.sector,
+      tag:      pos.tag || match.tag || ""
     });
   } else {
     pos.buyCount = pos.buyCount || 1;
@@ -346,20 +388,43 @@ function addPositionFromClient(pos) {
   return getAllPositions();
 }
 
-function editPositionFromClient(index, pos) {
-  editPosition(index, pos);
+function editPositionFromClient(id, pos) {
+  editPosition(id, pos);
   return getAllPositions();
 }
 
-function deletePositionFromClient(index) {
-  deletePosition(index);
+function deletePositionFromClient(id) {
+  deletePosition(id);
   return getAllPositions();
 }
 
-function sellPositionFromClient(index, sellData) {
-  sellPosition(index, sellData);
+function sellPositionFromClient(id, sellData) {
+  sellPosition(id, sellData);
   return getAllPositions();
 }
+
+// Backfills sector for any existing holdings that predate the sector
+// column (or were added before a Yahoo lookup succeeded). Safe to call
+// repeatedly — only fills rows that are still blank.
+function fetchSectorsForPortfolio() {
+  var sheet = getSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return getAllPositions();
+
+  var range = sheet.getRange(2, 1, lastRow - 1, 9);
+  var rows = range.getValues();
+  rows.forEach(function(row, i) {
+    if (row[7]) return; // sector already set
+    var sector = getSector(row[0]);
+    if (sector) {
+      sheet.getRange(2 + i, 8).setValue(sector);
+      Utilities.sleep(150); // be polite to Yahoo between symbols
+    }
+  });
+  return getAllPositions();
+}
+
+function fetchSectorsForPortfolioFromClient() { return fetchSectorsForPortfolio(); }
 
 
 
@@ -1061,21 +1126,4 @@ function fetchKeyDatesForPortfolioFromClient()    { return fetchKeyDatesForPortf
 
 function clearYahooSession() {
   CacheService.getScriptCache().remove("yf_session");
-}
-
-
-// --- Portfolio sector lookup (for concentration warning) --------
-// Reuses the same cached getSector() the watchlist already uses.
-
-function getPortfolioSectors(symbols) {
-  var results = {};
-  symbols.forEach(function(sym) {
-    results[sym] = getSector(sym); // getSector() already caches 6h per symbol
-    Utilities.sleep(80); // be polite to Yahoo between symbols not already cached
-  });
-  return results;
-}
-
-function getPortfolioSectorsFromClient(symbols) {
-  return getPortfolioSectors(symbols);
 }
