@@ -199,12 +199,15 @@ function fetchAllPrices(symbols) {
 
 // ─── Sheet helpers ────────────────────────────────────────────
 
-// Column layout: symbol, name, buyPrice, buyDate, shares, notes, buyCount, sector, id
-// "sector" and "id" were added later; ensurePortfolioSchema() migrates older
-// sheets in place (adds the header + backfills a stable id per row) so that
+// Column layout: symbol, name, buyPrice, buyDate, shares, notes, buyCount, sector, id, tag
+// "sector"/"id"/"tag" were added later; ensurePortfolioSchema() migrates older
+// sheets in place (adds headers + backfills a stable id per row) so that
 // edit/delete/sell no longer depend on positional row index from the client.
-var PORTFOLIO_HEADERS = ["symbol","name","buyPrice","buyDate","shares","notes","buyCount","sector","id"];
+// "tag" is a free-text user categorization (long/swing/dividend/speculative),
+// distinct from "sector" which is auto-fetched from Yahoo.
+var PORTFOLIO_HEADERS = ["symbol","name","buyPrice","buyDate","shares","notes","buyCount","sector","id","tag"];
 var PORTFOLIO_ID_COL  = PORTFOLIO_HEADERS.indexOf("id") + 1;
+var PORTFOLIO_TAG_COL = PORTFOLIO_HEADERS.indexOf("tag") + 1;
 
 function getSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -263,7 +266,7 @@ function getAllPositions() {
   var sheet = getSheet();
   var lastRow = sheet.getLastRow();
   if (lastRow <= 1) return [];
-  return sheet.getRange(2, 1, lastRow - 1, 9).getValues().map(function(row) {
+  return sheet.getRange(2, 1, lastRow - 1, 10).getValues().map(function(row) {
     return {
       symbol:   row[0] || "",
       name:     row[1] || "",
@@ -273,7 +276,8 @@ function getAllPositions() {
       notes:    row[5] || "",
       buyCount: Number(row[6]) || 1,
       sector:   row[7] || "",
-      id:       row[8] || ""
+      id:       row[8] || "",
+      tag:      row[9] || ""
     };
   });
 }
@@ -283,7 +287,7 @@ function addPosition(pos) {
   getSheet().appendRow([
     pos.symbol || "", pos.name || "", pos.buyPrice || 0,
     pos.buyDate || "", pos.shares || 0, pos.notes || "", pos.buyCount || 1,
-    sector, Utilities.getUuid()
+    sector, Utilities.getUuid(), pos.tag || ""
   ]);
 }
 
@@ -296,6 +300,7 @@ function editPosition(id, pos) {
     pos.buyDate || "", pos.shares || 0, pos.notes || "", pos.buyCount || 1,
     pos.sector || ""
   ]]);
+  sheet.getRange(row, PORTFOLIO_TAG_COL).setValue(pos.tag || "");
 }
 
 function deletePosition(id) {
@@ -373,7 +378,8 @@ function addPositionFromClient(pos) {
       shares:   total,
       notes:    pos.notes,
       buyCount: (Number(match.buyCount) || 1) + 1,
-      sector:   match.sector
+      sector:   match.sector,
+      tag:      pos.tag || match.tag || ""
     });
   } else {
     pos.buyCount = pos.buyCount || 1;
