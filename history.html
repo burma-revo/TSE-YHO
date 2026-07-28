@@ -54,10 +54,11 @@
         .summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #163030; }
         .sum-label { color: #456a68; font-size: 0.72rem; margin-bottom: 4px; }
         .sum-value { font-weight: bold; font-size: 0.95rem; color: #fff; margin-bottom: 5px; }
-        .dots { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 2px; min-height: 10px; }
-        .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-        .dot-win { background: #0ABAB5; }
-        .dot-loss { background: #ff5252; }
+        .hero-value { font-size: 1.5rem; font-weight: 800; margin-bottom: 2px; line-height: 1.1; }
+        .hero-sub { font-size: 0.7rem; color: #456a68; margin-bottom: 5px; }
+        .trend-caption { font-size: 0.7rem; margin-bottom: 5px; }
+        .trend-up { color: #0ABAB5; }
+        .trend-down { color: #ff5252; }
         .fill-bar { height: 4px; background: #163030; border-radius: 2px; overflow: hidden; }
         .fill-inner { height: 4px; border-radius: 2px; }
         .stacked-bar { height: 6px; border-radius: 3px; display: flex; overflow: hidden; }
@@ -66,8 +67,13 @@
         .empty { color: #456a68; text-align: center; padding: 30px 0; font-size: 0.9rem; }
         .export-btn { background: none; border: 1px solid #1a3a3a; border-radius: 6px; color: #7fb8b6; cursor: pointer; padding: 5px 12px; font-size: 0.8rem; transition: all 0.2s; }
         .export-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
+        .combined-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+        .combined-item { background: #0a1a1a; border: 1px solid #163030; border-radius: 8px; padding: 12px 14px; text-align: center; }
+        .combined-item.highlight { border-color: rgba(10,186,181,0.4); }
+        .combined-item .sum-value { font-size: 1.2rem; margin-bottom: 0; }
         @media (max-width: 600px) {
             .summary { grid-template-columns: repeat(2,1fr); }
+            .combined-grid { grid-template-columns: 1fr; }
             .sale-row { grid-template-columns: 1fr; }
             .row-right { align-items: flex-start; flex-direction: row; flex-wrap: wrap; gap: 8px; }
             .pl-bar-wrap { display: none; }
@@ -84,6 +90,17 @@
         <button class="nav-link active" onclick="navigate('history')">History</button>
         <button class="nav-link" onclick="navigate('watchlist')">Watchlist</button>
         <button class="nav-link" onclick="navigate('calendar')">Calendar</button>
+    </div>
+
+    <div class="card" id="combinedCard" style="display:none;">
+        <div class="card-header">
+            <div class="card-title">Portfolio P&amp;L</div>
+        </div>
+        <div class="combined-grid">
+            <div class="combined-item"><div class="sum-label">Realized (all-time)</div><div class="sum-value" id="combinedRealized">--</div></div>
+            <div class="combined-item"><div class="sum-label">Unrealized (current)</div><div class="sum-value" id="combinedUnrealized">--</div></div>
+            <div class="combined-item highlight"><div class="sum-label">Combined Total</div><div class="sum-value" id="combinedTotal">--</div></div>
+        </div>
     </div>
 
     <div class="card">
@@ -129,6 +146,42 @@ async function init() {
     } catch(e) {
         document.getElementById('saleRows').innerHTML = '<div class="empty">Could not load: ' + e.message + '</div>';
     }
+    loadCombinedPL();
+}
+
+// Combined Realized + Unrealized P&L, so "portfolio health" isn't split
+// across two pages — realized comes from all-time Sales, unrealized from
+// current holdings at live prices (same calc as the Portfolio page).
+async function loadCombinedPL() {
+    var card = document.getElementById('combinedCard');
+    try {
+        var totalRealized = allSales.reduce(function(sum, s) { return sum + (Number(s.profit) || 0); }, 0);
+
+        var portfolio = await gasRun('getAllPositions');
+        var totalUnrealized = 0;
+        if (portfolio.length > 0) {
+            var symbols  = portfolio.map(function(p) { return p.symbol; });
+            var priceMap = await gasRun('fetchAllPrices', symbols);
+            portfolio.forEach(function(p) {
+                var price = priceMap[p.symbol];
+                if (price != null) totalUnrealized += (price - p.buyPrice) * p.shares;
+            });
+        }
+
+        var combinedTotal = totalRealized + totalUnrealized;
+        setPl('combinedRealized', totalRealized);
+        setPl('combinedUnrealized', totalUnrealized);
+        setPl('combinedTotal', combinedTotal);
+        card.style.display = 'block';
+    } catch (e) {
+        card.style.display = 'none';
+    }
+}
+function setPl(id, val) {
+    var el = document.getElementById(id);
+    var cls = val > 0 ? 'pl-positive' : val < 0 ? 'pl-negative' : 'pl-zero';
+    el.className = 'sum-value ' + cls;
+    el.textContent = (val >= 0 ? '+' : '-') + '¥' + fmt(Math.abs(val));
 }
 
 function buildFilters() {
@@ -166,7 +219,7 @@ function render() {
     }
     var maxProfit = Math.max.apply(null, sales.map(function(s) { return Math.abs(Number(s.profit)||0); }));
     var html = '';
-    var totalProfit = 0, totalInvested = 0, wins = 0;
+    var totalProfit = 0, wins = 0;
     sales.slice().reverse().forEach(function(s) {
         var profit   = Number(s.profit)||0;
         var invested = Number(s.buyPrice)*Number(s.shares);
@@ -175,7 +228,7 @@ function render() {
         var plSign   = profit >= 0 ? '+' : '';
         var barPct   = maxProfit > 0 ? Math.round((Math.abs(profit)/maxProfit)*100) : 0;
         var barClass = profit >= 0 ? 'bar-pos' : 'bar-neg';
-        totalProfit  += profit; totalInvested += invested;
+        totalProfit  += profit;
         if (profit > 0) wins++;
         var buyFmt  = s.buyDate  ? fmtDate(s.buyDate)  : '';
         var sellFmt = s.sellDate ? fmtDate(s.sellDate) : '';
@@ -197,27 +250,50 @@ function render() {
     });
     document.getElementById('saleRows').innerHTML = html;
 
-    var totalPct   = totalInvested > 0 ? (totalProfit/totalInvested)*100 : 0;
     var totalClass = totalProfit > 0 ? 'pl-positive' : totalProfit < 0 ? 'pl-negative' : 'pl-zero';
     var totalSign  = totalProfit >= 0 ? '+' : '';
     var winRate    = sales.length > 0 ? Math.round((wins/sales.length)*100) : 0;
-    var maxDots = 20;
-    var shown = Math.min(sales.length, maxDots);
-    var winShown = Math.min(wins, shown);
-    var lossShown = shown - winShown;
-    var dotHtml = '';
-    for (var i = 0; i < winShown;  i++) dotHtml += '<div class="dot dot-win"></div>';
-    for (var i = 0; i < lossShown; i++) dotHtml += '<div class="dot dot-loss"></div>';
-    if (sales.length > maxDots) dotHtml += '<span style="font-size:0.7rem;color:#456a68;line-height:7px;">+' + (sales.length-maxDots) + '</span>';
-    var plBarPct  = Math.min(Math.abs(totalPct)/20*100, 100);
-    var plBarCls  = totalProfit >= 0 ? 'bar-pos' : 'bar-neg';
+
+    // Trend caption: compare this year's realized total to the prior year's,
+    // only meaningful when a specific year is selected (not "all").
+    var trendHtml = '';
+    if (currentFilter !== 'all') {
+        var prevYear = String(Number(currentFilter) - 1);
+        var prevTotal = allSales
+            .filter(function(s) { return s.sellDate && s.sellDate.slice(0,4) === prevYear; })
+            .reduce(function(sum, s) { return sum + (Number(s.profit)||0); }, 0);
+        var hasPrev = allSales.some(function(s) { return s.sellDate && s.sellDate.slice(0,4) === prevYear; });
+        if (hasPrev) {
+            var diff = totalProfit - prevTotal;
+            var trendCls = diff >= 0 ? 'trend-up' : 'trend-down';
+            var arrow = diff >= 0 ? '&#9650;' : '&#9660;';
+            trendHtml = '<div class="trend-caption ' + trendCls + '">' + arrow + ' ' + (diff>=0?'+':'-') + '¥' + fmt(Math.abs(diff)) + ' vs ' + prevYear + '</div>';
+        }
+    }
+
+    // Avg holding period: days between buy and sell, averaged over sales
+    // that have both dates.
+    var holdDurations = sales
+        .filter(function(s) { return s.buyDate && s.sellDate; })
+        .map(function(s) { return (new Date(s.sellDate+'T00:00:00') - new Date(s.buyDate+'T00:00:00')) / 86400000; });
+    var avgHoldDays = holdDurations.length > 0
+        ? Math.round(holdDurations.reduce(function(a,b){return a+b;},0) / holdDurations.length)
+        : null;
+
+    // Profit factor: gross profit / gross loss. More honest than avg %
+    // return, which one huge outlier trade can skew wildly.
+    var grossProfit = sales.filter(function(s){return (Number(s.profit)||0) > 0;}).reduce(function(sum,s){return sum+Number(s.profit);},0);
+    var grossLoss   = Math.abs(sales.filter(function(s){return (Number(s.profit)||0) < 0;}).reduce(function(sum,s){return sum+Number(s.profit);},0));
+    var profitFactorText;
+    if (grossLoss > 0) profitFactorText = (grossProfit/grossLoss).toFixed(2);
+    else profitFactorText = grossProfit > 0 ? '&#8734;' : '--';
 
     var summaryEl = document.getElementById('summary');
     summaryEl.style.display = 'grid';
     summaryEl.innerHTML =
-        '<div><div class="sum-label">Total Sales</div><div class="sum-value">' + sales.length + '</div><div class="dots">' + dotHtml + '</div></div>'
-      + '<div><div class="sum-label">Realized P&L</div><div class="sum-value ' + totalClass + '">' + totalSign + '-' + fmt(Math.abs(totalProfit)) + '</div><div class="fill-bar"><div class="fill-inner ' + plBarCls + '" style="width:' + plBarPct + '%"></div></div></div>'
-      + '<div><div class="sum-label">Avg return</div><div class="sum-value ' + totalClass + '">' + totalSign + totalPct.toFixed(1) + '%</div><div class="fill-bar"><div class="fill-inner ' + plBarCls + '" style="width:' + plBarPct + '%"></div></div></div>'
+        '<div><div class="sum-label">Realized P&L</div><div class="hero-value ' + totalClass + '">' + totalSign + '-' + fmt(Math.abs(totalProfit)) + '</div><div class="hero-sub">' + sales.length + ' sale' + (sales.length===1?'':'s') + '</div>' + trendHtml + '</div>'
+      + '<div><div class="sum-label">Avg Holding Period</div><div class="sum-value">' + (avgHoldDays != null ? avgHoldDays + 'd' : '--') + '</div></div>'
+      + '<div><div class="sum-label">Profit Factor</div><div class="sum-value">' + profitFactorText + '</div></div>'
       + '<div><div class="sum-label">Win rate</div><div class="sum-value">' + winRate + '%</div><div class="stacked-bar"><div class="stacked-win" style="flex:' + winRate + '"></div><div class="stacked-loss" style="flex:' + (100-winRate) + '"></div></div></div>';
 }
 
