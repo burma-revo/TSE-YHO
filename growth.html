@@ -7,42 +7,45 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a1a1a; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #050b14; color: #e0e0e0; min-height: 100vh; padding: 20px; position: relative; }
+        body::before, body::after { content: ''; position: fixed; width: 280px; height: 280px; border-radius: 50%; z-index: -1; pointer-events: none; }
+        body::before { top: -100px; right: -100px; background: radial-gradient(circle, rgba(0,255,220,0.10), transparent 70%); }
+        body::after { bottom: -100px; left: -100px; background: radial-gradient(circle, rgba(120,80,255,0.08), transparent 70%); }
         .container { max-width: 800px; margin: 0 auto; }
-        h1 { text-align: center; margin-bottom: 4px; font-size: 1.8rem; color: #0ABAB5; }
-        .subtitle { text-align: center; color: #7fb8b6; margin-bottom: 24px; font-size: 0.9rem; }
-        .nav-links { display: flex; justify-content: center; gap: 10px; margin-bottom: 28px; }
-        .nav-link { color: #7fb8b6; font-size: 0.85rem; text-decoration: none; border: 1px solid #1a3a3a; padding: 5px 14px; border-radius: 20px; transition: all 0.2s; }
-        .nav-link:hover { border-color: #0ABAB5; color: #0ABAB5; }
-        .nav-link.active { border-color: #0ABAB5; color: #0ABAB5; background: rgba(10,186,181,0.1); }
+        h1 { text-align: center; margin-bottom: 4px; font-size: 1.8rem; letter-spacing: 1px; background: linear-gradient(90deg, #00ffdd, #7f7bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .subtitle { text-align: center; color: #5ad9c9; margin-bottom: 24px; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; }
+        .nav-links { display: flex; justify-content: center; gap: 10px; margin-bottom: 28px; flex-wrap: wrap; }
+        .nav-link { color: #7fb8b6; font-size: 0.85rem; text-decoration: none; border: 1px solid rgba(223,247,242,0.12); padding: 5px 14px; border-radius: 20px; transition: all 0.2s; background: none; }
+        .nav-link:hover { border-color: #00ffdd; color: #00ffdd; }
+        .nav-link.active { border-color: rgba(0,255,220,0.5); color: #00ffdd; background: rgba(0,255,220,0.08); box-shadow: 0 0 10px rgba(0,255,220,0.25); }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
-        .stat-item { background: #0e2626; padding: 14px; border-radius: 8px; border: 1px solid #163030; }
-        .stat-label { color: #456a68; font-size: 0.75rem; margin-bottom: 4px; }
-        .stat-value { font-size: 1.1rem; font-weight: bold; color: #fff; }
-        .card { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .stat-item { background: rgba(0,0,0,0.25); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); }
+        .stat-label { color: #5ad9c9; font-size: 0.75rem; margin-bottom: 4px; }
+        .stat-value { font-family: 'Consolas', 'Courier New', monospace; font-size: 1.1rem; font-weight: bold; color: #fff; }
+        .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(0,255,220,0.2); border-radius: 14px; padding: 20px; margin-bottom: 20px; backdrop-filter: blur(6px); box-shadow: 0 0 24px rgba(0,255,220,0.05); }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
         .card-title { font-size: 1rem; font-weight: bold; color: #8fd4d1; }
         .range-btns { display: flex; gap: 6px; }
-        .range-btn { background: none; border: 1px solid #1a3a3a; border-radius: 6px; color: #7fb8b6; cursor: pointer; padding: 4px 12px; font-size: 0.8rem; transition: all 0.2s; }
-        .range-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
-        .range-btn.active { background: #0ABAB5; border-color: #0ABAB5; color: #0a1a1a; font-weight: bold; }
+        .range-btn { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #7fb8b6; cursor: pointer; padding: 4px 12px; font-size: 0.8rem; transition: all 0.2s; }
+        .range-btn:hover { border-color: #00ffdd; color: #00ffdd; }
+        .range-btn.active { background: linear-gradient(90deg, #00ffdd, #00c9a8); border-color: transparent; color: #04342c; font-weight: bold; box-shadow: 0 0 10px rgba(0,255,220,0.25); }
         .chart-wrap { position: relative; height: 320px; }
         .empty { color: #456a68; text-align: center; padding: 40px 0; font-size: 0.9rem; line-height: 1.7; }
-        .record-btn { background: rgba(10,186,181,0.15); color: #0ABAB5; border: 1px solid #0ABAB5; padding: 7px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: bold; transition: all 0.2s; }
-        .record-btn:hover { background: #0ABAB5; color: #0a1a1a; }
+        .record-btn { background: rgba(0,255,220,0.1); color: #00ffdd; border: 1px solid rgba(0,255,220,0.5); padding: 7px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: bold; transition: all 0.2s; box-shadow: 0 0 8px rgba(0,255,220,0.15); }
+        .record-btn:hover { background: linear-gradient(90deg, #00ffdd, #00c9a8); color: #04342c; }
         .record-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .history-scroll { max-height: 300px; overflow-y: auto; }
         .history-scroll::-webkit-scrollbar { width: 4px; }
-        .history-scroll::-webkit-scrollbar-track { background: #0a1a1a; }
-        .history-scroll::-webkit-scrollbar-thumb { background: #1a3a3a; border-radius: 2px; }
+        .history-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        .history-scroll::-webkit-scrollbar-thumb { background: rgba(0,255,220,0.3); border-radius: 2px; }
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        th { color: #456a68; font-weight: normal; padding: 8px 10px; border-bottom: 1px solid #163030; text-align: right; }
+        th { color: #456a68; font-weight: normal; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: right; }
         th:first-child { text-align: left; }
-        td { padding: 10px; border-bottom: 1px solid #0e2020; text-align: right; color: #e0e0e0; }
-        td:first-child { text-align: left; color: #7fb8b6; }
+        td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); text-align: right; color: #e0e0e0; font-family: 'Consolas', 'Courier New', monospace; }
+        td:first-child { text-align: left; color: #7fb8b6; font-family: 'Segoe UI', sans-serif; }
         tr:last-child td { border-bottom: none; }
-        .pl-positive { color: #0ABAB5; }
-        .pl-negative { color: #ff5252; }
+        .pl-positive { color: #00ffb0; text-shadow: 0 0 6px rgba(0,255,176,0.3); }
+        .pl-negative { color: #ff5c7a; text-shadow: 0 0 6px rgba(255,60,90,0.3); }
         .count-label { font-size: 0.8rem; color: #456a68; }
     </style>
 </head>
@@ -56,16 +59,15 @@
         <button class="nav-link" onclick="navigate('history')">History</button>
         <button class="nav-link" onclick="navigate('watchlist')">Watchlist</button>
         <button class="nav-link" onclick="navigate('calendar')">Calendar</button>
-        <button class="nav-link" onclick="navigate('news')">News</button>
     </div>
 
     <div class="stats-grid" id="statsGrid">
         <div class="stat-item"><div class="stat-label">Current Value</div><div class="stat-value" id="statValue">--</div></div>
         <div class="stat-item"><div class="stat-label">Total Invested</div><div class="stat-value" id="statInvested">--</div></div>
         <div class="stat-item"><div class="stat-label">Unrealized P&amp;L</div><div class="stat-value" id="statPL">--</div></div>
-        <div class="stat-item"><div class="stat-label">All-time High</div><div class="stat-value" style="color:#f0a030" id="statATH">--</div></div>
+        <div class="stat-item"><div class="stat-label">All-time High</div><div class="stat-value" style="color:#ffb347;text-shadow:0 0 8px rgba(255,179,71,0.35)" id="statATH">--</div></div>
         <div class="stat-item"><div class="stat-label">Days Since ATH</div><div class="stat-value" id="statDaysSinceATH">--</div></div>
-        <div class="stat-item"><div class="stat-label">Max Drawdown</div><div class="stat-value" style="color:#ff5252" id="statMaxDD">--</div></div>
+        <div class="stat-item"><div class="stat-label">Max Drawdown</div><div class="stat-value" style="color:#ff5c7a;text-shadow:0 0 8px rgba(255,60,90,0.35)" id="statMaxDD">--</div></div>
     </div>
 
     <div class="card">
@@ -199,8 +201,8 @@ function renderChart(days) {
     var values    = data.map(function(r) { return r.value; });
     var investeds = data.map(function(r) { return r.invested; });
     var isUp      = values[values.length - 1] >= values[0];
-    var lineColor = isUp ? '#0ABAB5' : '#ff5252';
-    var fillColor = isUp ? 'rgba(10,186,181,0.08)' : 'rgba(255,82,82,0.08)';
+    var lineColor = isUp ? '#00ffdd' : '#ff5c7a';
+    var fillColor = isUp ? 'rgba(0,255,220,0.10)' : 'rgba(255,60,90,0.10)';
 
     if (growthChart) growthChart.destroy();
 
@@ -244,10 +246,10 @@ function renderChart(days) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: '#0a1a1a',
-                    borderColor: '#1a3a3a',
+                    backgroundColor: 'rgba(5,11,20,0.95)',
+                    borderColor: 'rgba(0,255,220,0.3)',
                     borderWidth: 1,
-                    titleColor: '#7fb8b6',
+                    titleColor: '#5ad9c9',
                     bodyColor: '#e0e0e0',
                     callbacks: {
                         label: function(ctx) {
@@ -258,13 +260,13 @@ function renderChart(days) {
                 }
             },
             scales: {
-                x: { ticks: { color:'#456a68', maxTicksLimit:8, maxRotation:0 }, grid: { color:'#0e2626' } },
+                x: { ticks: { color:'#456a68', maxTicksLimit:8, maxRotation:0 }, grid: { color:'rgba(255,255,255,0.05)' } },
                 y: {
                     ticks: {
                         color: '#456a68',
                         callback: function(v) { return '\u00A5' + (v / 1000).toFixed(0) + 'k'; }
                     },
-                    grid: { color: '#0e2626' }
+                    grid: { color: 'rgba(255,255,255,0.05)' }
                 }
             }
         }

@@ -19,15 +19,14 @@ function doGet(e) {
   // Serve HTML pages
   if (!action) {
     var page   = (e && e.parameter && e.parameter.page) || "portfolio";
-    var valid  = ["portfolio", "growth", "history", "watchlist", "calendar", "news"];
+    var valid  = ["portfolio", "growth", "history", "watchlist", "calendar"];
     if (valid.indexOf(page) === -1) page = "portfolio";
     var titles = {
       portfolio: "TSE Tracker",
       growth: "TSE Tracker - Growth",
       history: "TSE Tracker - History",
       watchlist: "TSE Tracker - Watchlist",
-      calendar: "TSE Tracker - Calendar",
-      news: "TSE Tracker - News"
+      calendar: "TSE Tracker - Calendar"
     };
     var file   = page === "portfolio" ? "index" : page;
     return HtmlService
@@ -1127,134 +1126,4 @@ function fetchKeyDatesForPortfolioFromClient()    { return fetchKeyDatesForPortf
 
 function clearYahooSession() {
   CacheService.getScriptCache().remove("yf_session");
-}
-
-// ============================================================
-//  NEWS DIGEST — daily headlines for portfolio + watchlist
-//
-//  HOW TO SET UP THE DAILY TRIGGER:
-//    1. Apps Script editor -> Triggers -> + Add Trigger
-//    2. Function: sendNewsDigestEmail
-//    3. Event source: Time-driven, Type: Day timer
-//    4. Time: 7am-8am (before market open)
-//    5. Save
-// ============================================================
-
-var TTL_NEWS = 3600; // 1 hour — headlines don't change that fast
-
-// Yahoo's /v1/finance/search endpoint returns a "news" array alongside
-// quote matches. It's unofficial but doesn't require the cookie/crumb
-// session that quoteSummary needs, so it works even if that Yahoo
-// session handshake ever breaks again.
-function getNewsForSymbol(symbol) {
-  var cache = CacheService.getScriptCache();
-  var key = "news_" + symbol;
-  var cached = cache.get(key);
-  if (cached) {
-    try { return JSON.parse(cached); } catch (e) {}
-  }
-
-  var items = [];
-  try {
-    var url = "https://query1.finance.yahoo.com/v1/finance/search?q=" + encodeURIComponent(symbol)
-            + "&newsCount=6&quotesCount=0";
-    var res = UrlFetchApp.fetch(url, {
-      muteHttpExceptions: true,
-      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" }
-    });
-    if (res.getResponseCode() === 200) {
-      var data = JSON.parse(res.getContentText());
-      (data.news || []).forEach(function(n) {
-        items.push({
-          title:     n.title || "",
-          publisher: n.publisher || "",
-          link:      n.link || "",
-          time:      n.providerPublishTime ? n.providerPublishTime * 1000 : 0
-        });
-      });
-    }
-  } catch (e) {}
-
-  try { cache.put(key, JSON.stringify(items), TTL_NEWS); } catch (e) {}
-  return items;
-}
-
-// Builds a fresh headline list for everything in the portfolio and
-// watchlist, deduped by link, newest first. `hoursBack` filters out
-// older stories (default 36h to comfortably span an overnight gap).
-function getNewsDigest(hoursBack) {
-  hoursBack = hoursBack || 36;
-  var cutoff = Date.now() - hoursBack * 3600 * 1000;
-
-  var positions = getAllPositions();
-  var watchlist = getAllWatchlist();
-  var bySymbol = {};
-  positions.forEach(function(p) { bySymbol[p.symbol] = p.name; });
-  watchlist.forEach(function(w) { if (!bySymbol[w.symbol]) bySymbol[w.symbol] = w.name; });
-
-  var symbols = Object.keys(bySymbol);
-  var seenLinks = {};
-  var groups = [];
-
-  symbols.forEach(function(symbol) {
-    var items = getNewsForSymbol(symbol).filter(function(n) {
-      if (!n.time || n.time < cutoff) return false;
-      if (n.link && seenLinks[n.link]) return false;
-      if (n.link) seenLinks[n.link] = true;
-      return true;
-    });
-    if (items.length > 0) {
-      items.sort(function(a, b) { return b.time - a.time; });
-      groups.push({ symbol: symbol, name: bySymbol[symbol], items: items });
-    }
-    Utilities.sleep(100); // be polite to Yahoo between symbols
-  });
-
-  return groups;
-}
-
-function getNewsDigestFromClient(hoursBack) {
-  return getNewsDigest(hoursBack);
-}
-
-// Meant to run on the daily morning trigger; also client-callable for
-// an on-demand "send me a test email" button.
-function sendNewsDigestEmail() {
-  var groups = getNewsDigest(36);
-  var to = Session.getActiveUser().getEmail();
-  if (!to) return;
-
-  var today = formatDate(new Date());
-  if (groups.length === 0) {
-    return; // nothing new — don't spam an empty email every morning
-  }
-
-  var html = '<div style="font-family:Segoe UI,Arial,sans-serif;color:#1a1a1a;">';
-  html += '<h2 style="color:#0ABAB5;">TSE Tracker — Morning News Digest (' + today + ')</h2>';
-  groups.forEach(function(g) {
-    html += '<h3 style="margin-bottom:4px;">' + g.name + ' (' + g.symbol + ')</h3><ul>';
-    g.items.forEach(function(n) {
-      html += '<li><a href="' + n.link + '">' + n.title + '</a> — <span style="color:#666;">' + n.publisher + '</span></li>';
-    });
-    html += '</ul>';
-  });
-  html += '</div>';
-
-  var textLines = [];
-  groups.forEach(function(g) {
-    textLines.push(g.name + " (" + g.symbol + ")");
-    g.items.forEach(function(n) { textLines.push("- " + n.title + " [" + n.publisher + "] " + n.link); });
-  });
-
-  MailApp.sendEmail({
-    to: to,
-    subject: "TSE Tracker: Morning News Digest — " + today,
-    body: textLines.join("\n"),
-    htmlBody: html
-  });
-}
-
-function sendNewsDigestEmailFromClient() {
-  sendNewsDigestEmail();
-  return "sent";
 }

@@ -7,55 +7,59 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a1a1a; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #050b14; color: #e0e0e0; min-height: 100vh; padding: 20px; position: relative; }
+        body::before, body::after { content: ''; position: fixed; width: 280px; height: 280px; border-radius: 50%; z-index: -1; pointer-events: none; }
+        body::before { top: -100px; right: -100px; background: radial-gradient(circle, rgba(0,255,220,0.10), transparent 70%); }
+        body::after { bottom: -100px; left: -100px; background: radial-gradient(circle, rgba(120,80,255,0.08), transparent 70%); }
         .container { max-width: 800px; margin: 0 auto; }
-        h1 { text-align: center; margin-bottom: 4px; font-size: 1.8rem; color: #0ABAB5; }
-        .subtitle { text-align: center; color: #7fb8b6; margin-bottom: 24px; font-size: 0.9rem; }
+        h1 { text-align: center; margin-bottom: 4px; font-size: 1.8rem; letter-spacing: 1px; background: linear-gradient(90deg, #00ffdd, #7f7bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .subtitle { text-align: center; color: #5ad9c9; margin-bottom: 24px; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; }
         .nav-links { display: flex; justify-content: center; gap: 10px; margin-bottom: 28px; flex-wrap: wrap; }
-        .nav-link { color: #7fb8b6; font-size: 0.85rem; border: 1px solid #1a3a3a; padding: 5px 14px; border-radius: 20px; transition: all 0.2s; background: none; cursor: pointer; }
-        .nav-link:hover { border-color: #0ABAB5; color: #0ABAB5; }
-        .nav-link.active { border-color: #0ABAB5; color: #0ABAB5; background: rgba(10,186,181,0.1); }
-        .card { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .nav-link { color: #7fb8b6; font-size: 0.85rem; border: 1px solid rgba(223,247,242,0.12); padding: 5px 14px; border-radius: 20px; transition: all 0.2s; background: none; cursor: pointer; }
+        .nav-link:hover { border-color: #00ffdd; color: #00ffdd; }
+        .nav-link.active { border-color: rgba(0,255,220,0.5); color: #00ffdd; background: rgba(0,255,220,0.08); box-shadow: 0 0 10px rgba(0,255,220,0.25); }
+        .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(0,255,220,0.2); border-radius: 14px; padding: 20px; margin-bottom: 20px; backdrop-filter: blur(6px); box-shadow: 0 0 24px rgba(0,255,220,0.05); }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
-        .card-title { font-size: 1.1rem; font-weight: bold; color: #0ABAB5; }
-        .add-btn { background: rgba(10,186,181,0.15); color: #0ABAB5; border: 1px solid #0ABAB5; padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: bold; }
-        .add-btn:hover { background: #0ABAB5; color: #0a1a1a; }
+        .card-title { font-size: 1.1rem; font-weight: bold; color: #00ffdd; text-shadow: 0 0 8px rgba(0,255,220,0.3); }
+        .add-btn { background: rgba(0,255,220,0.1); color: #00ffdd; border: 1px solid rgba(0,255,220,0.5); padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: bold; box-shadow: 0 0 8px rgba(0,255,220,0.15); }
+        .add-btn:hover { background: linear-gradient(90deg, #00ffdd, #00c9a8); color: #04342c; }
         .rows { max-height: 460px; overflow-y: auto; }
         .rows::-webkit-scrollbar { width: 6px; }
-        .rows::-webkit-scrollbar-track { background: #0a1a1a; border-radius: 3px; }
-        .rows::-webkit-scrollbar-thumb { background: #1a3a3a; border-radius: 3px; }
-        .w-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 12px 14px; background: #0a1a1a; border-radius: 8px; border: 1px solid #163030; margin-bottom: 8px; align-items: center; }
-        .w-row:hover { border-color: #1a4a4a; }
+        .rows::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
+        .rows::-webkit-scrollbar-thumb { background: rgba(0,255,220,0.3); border-radius: 3px; }
+        .w-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 12px 14px; background: rgba(0,0,0,0.25); border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 8px; align-items: center; transition: border-color 0.2s, box-shadow 0.2s; }
+        .w-row:hover { border-color: rgba(0,255,220,0.3); box-shadow: 0 0 10px rgba(0,255,220,0.08); }
         .w-left { min-width: 0; }
         .w-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
         .w-name { font-weight: bold; color: #fff; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
         .w-sym { color: #456a68; font-size: 0.75rem; }
-        .sector-badge { font-size: 0.68rem; background: #163030; color: #8fd4d1; padding: 2px 8px; border-radius: 10px; }
+        .sector-badge { font-size: 0.68rem; background: rgba(127,123,255,0.12); border: 1px solid rgba(127,123,255,0.3); color: #c9c4ff; padding: 2px 8px; border-radius: 10px; }
         .w-meta { font-size: 0.75rem; color: #7fb8b6; }
         .w-current { text-align: right; }
         .now-label { color: #456a68; font-size: 0.72rem; }
-        .now-price { font-size: 0.9rem; font-weight: bold; color: #fff; }
-        .change-pct { font-size: 0.8rem; font-weight: bold; }
-        .pl-positive { color: #0ABAB5; }
-        .pl-negative { color: #ff5252; }
+        .now-price { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.9rem; font-weight: bold; color: #fff; }
+        .change-pct { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.8rem; font-weight: bold; }
+        .pl-positive { color: #00ffb0; text-shadow: 0 0 6px rgba(0,255,176,0.3); }
+        .pl-negative { color: #ff5c7a; text-shadow: 0 0 6px rgba(255,60,90,0.3); }
         .pl-zero { color: #7fb8b6; }
         .w-actions { display: flex; flex-direction: column; gap: 4px; }
-        .w-btn { background: none; border: 1px solid #1a3a3a; border-radius: 6px; color: #7fb8b6; cursor: pointer; padding: 4px 10px; font-size: 0.75rem; }
-        .w-btn:hover { border-color: #0ABAB5; color: #0ABAB5; }
-        .w-btn.buy { border-color: #0ABAB5; color: #0ABAB5; }
-        .w-btn.del:hover { border-color: #ff5252; color: #ff5252; }
+        .w-btn { background: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #7fb8b6; cursor: pointer; padding: 4px 10px; font-size: 0.75rem; }
+        .w-btn:hover { border-color: #00ffdd; color: #00ffdd; box-shadow: 0 0 8px rgba(0,255,220,0.2); }
+        .w-btn.buy { border-color: rgba(0,255,220,0.4); color: #00ffdd; }
+        .w-btn.del:hover { border-color: #ff5c7a; color: #ff5c7a; box-shadow: 0 0 8px rgba(255,60,90,0.2); }
         .empty { color: #456a68; text-align: center; padding: 30px 0; font-size: 0.9rem; }
-        .modal-overlay { display: none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .modal-overlay { display: none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; padding: 20px; backdrop-filter: blur(3px); }
         .modal-overlay.active { display: flex; }
-        .modal { background: #0e2626; border: 1px solid #1a3a3a; border-radius: 12px; padding: 24px; width: 100%; max-width: 400px; }
-        .modal-title { font-size: 1.1rem; font-weight: bold; color: #0ABAB5; margin-bottom: 18px; }
+        .modal { background: rgba(10,20,25,0.9); border: 1px solid rgba(0,255,220,0.25); border-radius: 14px; padding: 24px; width: 100%; max-width: 400px; backdrop-filter: blur(8px); box-shadow: 0 0 30px rgba(0,255,220,0.1); }
+        .modal-title { font-size: 1.1rem; font-weight: bold; color: #00ffdd; margin-bottom: 18px; text-shadow: 0 0 8px rgba(0,255,220,0.3); }
         .modal-field { margin-bottom: 12px; }
         .modal-field label { display: block; color: #7fb8b6; font-size: 0.8rem; margin-bottom: 4px; }
-        .modal-field input, .modal-field select { width: 100%; padding: 9px 12px; border: 1px solid #1a3a3a; border-radius: 8px; background: #0a1a1a; color: #e0e0e0; font-size: 0.9rem; }
+        .modal-field input, .modal-field select { width: 100%; padding: 9px 12px; border: 1px solid rgba(0,255,220,0.15); border-radius: 8px; background: rgba(0,0,0,0.3); color: #e0e0e0; font-size: 0.9rem; }
+        .modal-field input:focus, .modal-field select:focus { border-color: #00ffdd; box-shadow: 0 0 8px rgba(0,255,220,0.15); outline: none; }
         .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
         .modal-btn { padding: 9px 18px; border-radius: 8px; font-size: 0.88rem; cursor: pointer; font-weight: bold; border: none; }
-        .modal-btn.primary { background: #0ABAB5; color: #0a1a1a; }
-        .modal-btn.secondary { background: #1a3a3a; color: #7fb8b6; }
+        .modal-btn.primary { background: linear-gradient(90deg, #00ffdd, #00c9a8); color: #04342c; box-shadow: 0 0 12px rgba(0,255,220,0.25); }
+        .modal-btn.secondary { background: rgba(255,255,255,0.06); color: #7fb8b6; }
         .chart-modal { max-width: 560px; }
         .chart-modal-wrap { position: relative; height: 260px; margin-top: 12px; }
         .chart-empty { color: #456a68; text-align: center; padding: 40px 0; font-size: 0.85rem; }
@@ -75,7 +79,6 @@
         <button class="nav-link" onclick="navigate('history')">History</button>
         <button class="nav-link active" onclick="navigate('watchlist')">Watchlist</button>
         <button class="nav-link" onclick="navigate('calendar')">Calendar</button>
-        <button class="nav-link" onclick="navigate('news')">News</button>
     </div>
 
     <div class="card">
@@ -227,8 +230,8 @@ async function openChartModal(index) {
     var noticeLine = rows.map(function() { return w.noticePrice; });
 
     var isUp = prices[prices.length-1] >= prices[0];
-    var lineColor = isUp ? '#0ABAB5' : '#ff5252';
-    var fillColor = isUp ? 'rgba(10,186,181,0.08)' : 'rgba(255,82,82,0.08)';
+    var lineColor = isUp ? '#00ffdd' : '#ff5c7a';
+    var fillColor = isUp ? 'rgba(0,255,220,0.10)' : 'rgba(255,60,90,0.10)';
 
     if (watchChart) watchChart.destroy();
     watchChart = new Chart(document.getElementById('watchChart').getContext('2d'), {
@@ -246,7 +249,7 @@ async function openChartModal(index) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: '#0a1a1a', borderColor: '#1a3a3a', borderWidth: 1, titleColor: '#7fb8b6', bodyColor: '#e0e0e0',
+                    backgroundColor: 'rgba(5,11,20,0.95)', borderColor: 'rgba(0,255,220,0.3)', borderWidth: 1, titleColor: '#5ad9c9', bodyColor: '#e0e0e0',
                     callbacks: { label: function(ctx) {
                         var prefix = ctx.datasetIndex === 0 ? 'Price: ' : 'Notice: ';
                         return prefix + '\u00A5' + ctx.parsed.y.toLocaleString();
@@ -254,8 +257,8 @@ async function openChartModal(index) {
                 }
             },
             scales: {
-                x: { ticks: { color: '#456a68', maxTicksLimit: 8, maxRotation: 0 }, grid: { color: '#0e2626' } },
-                y: { ticks: { color: '#456a68', callback: function(v) { return '\u00A5' + v.toLocaleString(); } }, grid: { color: '#0e2626' } }
+                x: { ticks: { color: '#456a68', maxTicksLimit: 8, maxRotation: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#456a68', callback: function(v) { return '\u00A5' + v.toLocaleString(); } }, grid: { color: 'rgba(255,255,255,0.05)' } }
             }
         }
     });

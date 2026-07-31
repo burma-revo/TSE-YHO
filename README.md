@@ -22,7 +22,6 @@ Single deployment, routed via `?page=` (defaults to `portfolio`). Every page sha
 | History | [`history.html`](history.html) | `history` | Realized vs. unrealized P&L dashboard, sales ledger |
 | Watchlist | [`watchlist.html`](watchlist.html) | `watchlist` | Stocks you're tracking but don't own yet, weekly price history |
 | Calendar | [`calendar.html`](calendar.html) | `calendar` | Earnings / dividend / 優待 / custom key dates, optional Google Calendar sync |
-| News | [`news.html`](news.html) | `news` | Headline digest for everything in your portfolio + watchlist |
 
 ## Backend
 
@@ -110,8 +109,6 @@ Backfilled weekly for earnings + dividend dates (`fetchKeyDatesForPortfolio`); �
 | `source` | string | `auto` (Yahoo) or `manual` |
 | `calendarEventId` | string | Set if pushed to Google Calendar |
 
-> **News** has no dedicated sheet — headlines are fetched live from Yahoo Finance and cached briefly (`CacheService`, ~1h TTL). Nothing is written to the spreadsheet.
-
 ## Time-driven triggers
 
 None of these are required for the app to function, but each unlocks a feature. Set up from the Apps Script editor: **Triggers → + Add Trigger**.
@@ -121,7 +118,6 @@ None of these are required for the app to function, but each unlocks a feature. 
 | `recordSnapshot` | Daily, ~4–5pm (after TSE closes 3:30pm JST) | Growth page history |
 | `recordWatchlistPrices` | Weekly, Monday ~9am | Watchlist price charts |
 | `fetchKeyDatesForPortfolio` | Weekly, Monday ~6am | Auto-filled earnings/dividend dates |
-| `sendNewsDigestEmail` | Daily, ~7am (before market open) | Morning news digest email |
 
 ## Setup
 
@@ -129,4 +125,4 @@ None of these are required for the app to function, but each unlocks a feature. 
 2. Copy `Code.gs` and every `.html` file into the Apps Script project (or sync via a GitHub-connected editor extension).
 3. **Deploy → New deployment → Web app**, execute as *Me*, access *Anyone*.
 4. Open the deployed URL — sheets and headers are created automatically on first use.
-5. (Optional) Add the time-driven triggers above for snapshots, watchlist history, key dates, and the news digest.
+5. (Optional) Add the time-driven triggers above for snapshots, watchlist history, and key dates.

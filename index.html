@@ -74,7 +74,7 @@
         .portfolio-rows { max-height: 320px; overflow-y: auto; }
         .portfolio-rows::-webkit-scrollbar { width: 6px; }
         .portfolio-rows::-webkit-scrollbar-track { background: #0a1a1a; border-radius: 3px; }
-        .portfolio-rows::-webkit-scrollbar-thumb { background: #1a3a3a; border-radius: 3px; }
+        .portfolio-rows::-webkit-scrollbar-thumb { background: rgba(0,255,220,0.3); border-radius: 3px; }
         .portfolio-rows::-webkit-scrollbar-thumb:hover { background: #00ffdd; }
         .portfolio-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
         .portfolio-title { font-size: 1.1rem; font-weight: bold; color: #c9c4ff; letter-spacing: 0.5px; }
@@ -92,7 +92,14 @@
         .tag-swing { background: rgba(255,179,71,0.12); color: #ffb347; box-shadow: 0 0 6px rgba(255,179,71,0.15); }
         .tag-dividend { background: rgba(120,180,255,0.12); color: #78b4ff; box-shadow: 0 0 6px rgba(120,180,255,0.15); }
         .tag-speculative { background: rgba(255,92,122,0.12); color: #ff5c7a; box-shadow: 0 0 6px rgba(255,92,122,0.15); }
-        .concentration-banner { background: rgba(255,179,71,0.08); border: 1px solid rgba(255,179,71,0.35); border-radius: 8px; padding: 10px 14px; margin-top: 12px; font-size: 0.82rem; color: #ffb347; display: none; }
+        .concentration-banner { background: rgba(255,179,71,0.06); border: 1px solid rgba(255,179,71,0.35); border-radius: 14px; padding: 16px 18px; margin-top: 12px; box-shadow: 0 0 20px rgba(255,179,71,0.08); display: none; }
+        .concentration-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .concentration-title { font-weight: bold; color: #fff; font-size: 0.92rem; }
+        .concentration-pct { font-family: 'Consolas', 'Courier New', monospace; font-weight: bold; color: #ffb347; }
+        .concentration-track { position: relative; height: 10px; border-radius: 6px; background: rgba(255,255,255,0.06); margin-bottom: 8px; }
+        .concentration-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #ffb347, #ff7b47); box-shadow: 0 0 10px rgba(255,179,71,0.5); transition: width 0.4s; }
+        .concentration-threshold { position: absolute; top: -4px; width: 2px; height: 18px; background: rgba(255,255,255,0.4); }
+        .concentration-note { font-size: 0.7rem; color: #8fa9a4; }
         .portfolio-position { text-align: right; font-size: 0.85rem; color: #8fd4d1; white-space: nowrap; font-family: 'Consolas', 'Courier New', monospace; }
         .portfolio-current { text-align: right; font-size: 0.85rem; color: #fff; white-space: nowrap; font-family: 'Consolas', 'Courier New', monospace; }
         .portfolio-current .current-label { color: #456a68; font-size: 0.75rem; font-family: 'Segoe UI', sans-serif; }
@@ -160,7 +167,6 @@
         <button class="nav-link" onclick="navigate('history')">History</button>
         <button class="nav-link" onclick="navigate('watchlist')">Watchlist</button>
         <button class="nav-link" onclick="navigate('calendar')">Calendar</button>
-        <button class="nav-link" onclick="navigate('news')">News</button>
     </div>
 
     <!-- Navigation -->
@@ -768,7 +774,17 @@ function renderSectorConcentration(sectors, values, totalVal) {
     var pct = (bySector[top] / totalVal) * 100;
     if (pct >= 40) {
         bannerEl.style.display = 'block';
-        bannerEl.innerHTML = '⚠️ ' + pct.toFixed(0) + '% of your portfolio is concentrated in <strong>' + esc(top) + '</strong>. Consider diversifying.';
+        var fillPct = Math.min(pct, 100).toFixed(1);
+        bannerEl.innerHTML =
+            '<div class="concentration-head">'
+          +   '<span class="concentration-title">&#9888; Concentration risk: ' + esc(top) + '</span>'
+          +   '<span class="concentration-pct">' + pct.toFixed(0) + '%</span>'
+          + '</div>'
+          + '<div class="concentration-track">'
+          +   '<div class="concentration-fill" style="width:' + fillPct + '%"></div>'
+          +   '<div class="concentration-threshold" style="left:40%"></div>'
+          + '</div>'
+          + '<div class="concentration-note">Safe threshold marked at 40% &middot; consider trimming or diversifying</div>';
     } else {
         bannerEl.style.display = 'none';
     }
