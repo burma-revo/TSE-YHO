@@ -125,8 +125,8 @@
         .treemap-cell:hover { filter: brightness(1.25); transform: translateY(-2px); z-index: 5; }
         .treemap-cell.overweight { border: 1px solid rgba(255,60,90,0.6); }
         .treemap-overweight-tag { position: absolute; top: 5px; right: 6px; font-size: 0.58rem; font-weight: bold; color: #ff5c7a; background: rgba(255,60,90,0.15); padding: 1px 6px; border-radius: 6px; box-shadow: 0 0 6px rgba(255,60,90,0.3); white-space: nowrap; }
+        .treemap-weight-tag { position: absolute; top: 5px; left: 6px; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.58rem; font-weight: bold; color: #dff7f2; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 6px; white-space: nowrap; }
         .treemap-sym { font-size: 0.78rem; font-weight: 700; color: #fff; text-align: center; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
-        .treemap-weight { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.62rem; color: rgba(255,255,255,0.75); text-shadow: 0 1px 3px rgba(0,0,0,0.5); margin-top: 1px; }
         .treemap-pct { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.88rem; font-weight: 700; color: #fff; text-shadow: 0 0 8px currentColor, 0 1px 3px rgba(0,0,0,0.5); }
         .treemap-val { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.6rem; color: rgba(255,255,255,0.75); text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
         .treemap-tooltip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px); background: rgba(5,11,20,0.95); border: 1px solid rgba(0,255,220,0.3); border-radius: 8px; padding: 6px 10px; font-size: 0.72rem; font-weight: 600; color: #dff7f2; white-space: nowrap; box-shadow: 0 0 16px rgba(0,255,220,0.15); backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity 0.15s, transform 0.15s; z-index: 10; }
@@ -745,10 +745,10 @@ async function renderPortfolio() {
             var pctColor = 'rgb(' + glowR + ',' + glowG + ',' + glowB + ')';
             var isOverweight = pct >= POSITION_RISK_THRESHOLD;
             tmHtml += '<div class="treemap-cell' + (isOverweight ? ' overweight' : '') + '" style="flex-grow:' + Math.max(pct,8).toFixed(1) + ';background:' + bgGrad + ';box-shadow:' + glow + '">'
+                    + '<div class="treemap-weight-tag">' + pct.toFixed(1) + '%</div>'
                     + (isOverweight ? '<div class="treemap-overweight-tag">overweight</div>' : '')
                     + '<div class="treemap-tooltip">' + esc(name) + '</div>'
                     + '<div class="treemap-sym">' + esc(chartSymbols[i] || '') + '</div>'
-                    + '<div class="treemap-weight">' + pct.toFixed(1) + '% of portfolio</div>'
                     + '<div class="treemap-pct" style="color:' + pctColor + '">' + sign + plp.toFixed(1) + '%</div>'
                     + '<div class="treemap-val">\u00A5' + formatNum(chartValues[i]) + '</div>'
                     + '</div>';
