@@ -121,11 +121,16 @@
         .summary-value { font-family: 'Consolas', 'Courier New', monospace; font-weight: bold; font-size: 0.95rem; color: #fff; }
         #allocationChart { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); }
         .treemap-grid { display: flex; flex-wrap: wrap; gap: 5px; }
-        .treemap-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 60px; min-height: 64px; padding: 8px 4px; cursor: default; overflow: hidden; border-radius: 10px; border: 1px solid rgba(255,255,255,0.09); backdrop-filter: blur(4px); transition: filter 0.2s, transform 0.2s, box-shadow 0.2s; }
-        .treemap-cell:hover { filter: brightness(1.25); transform: translateY(-2px); }
+        .treemap-cell { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 60px; min-height: 64px; padding: 8px 4px; cursor: default; border-radius: 10px; border: 1px solid rgba(255,255,255,0.09); backdrop-filter: blur(4px); transition: filter 0.2s, transform 0.2s, box-shadow 0.2s; }
+        .treemap-cell:hover { filter: brightness(1.25); transform: translateY(-2px); z-index: 5; }
+        .treemap-cell.overweight { border: 1px solid rgba(255,60,90,0.6); }
+        .treemap-overweight-tag { position: absolute; top: 5px; right: 6px; font-size: 0.58rem; font-weight: bold; color: #ff5c7a; background: rgba(255,60,90,0.15); padding: 1px 6px; border-radius: 6px; box-shadow: 0 0 6px rgba(255,60,90,0.3); white-space: nowrap; }
         .treemap-name { font-size: 0.72rem; font-weight: 600; color: #fff; text-align: center; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+        .treemap-sym { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.6rem; color: rgba(255,255,255,0.7); text-shadow: 0 1px 3px rgba(0,0,0,0.5); margin-top: 1px; }
         .treemap-pct { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.88rem; font-weight: 700; color: #fff; text-shadow: 0 0 8px currentColor, 0 1px 3px rgba(0,0,0,0.5); }
         .treemap-val { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.6rem; color: rgba(255,255,255,0.75); text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+        .treemap-tooltip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px); background: rgba(5,11,20,0.95); border: 1px solid rgba(0,255,220,0.3); border-radius: 8px; padding: 6px 10px; font-size: 0.72rem; font-weight: 600; color: #dff7f2; white-space: nowrap; box-shadow: 0 0 16px rgba(0,255,220,0.15); backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity 0.15s, transform 0.15s; z-index: 10; }
+        .treemap-cell:hover .treemap-tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
         .add-portfolio-btn { background: rgba(0,255,220,0.1); color: #00ffdd; border: 1px solid rgba(0,255,220,0.5); padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: bold; transition: all 0.2s; box-shadow: 0 0 8px rgba(0,255,220,0.15); }
         .add-portfolio-btn:hover { background: linear-gradient(90deg, #00ffdd, #00c9a8); color: #04342c; }
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; padding: 20px; backdrop-filter: blur(3px); }
@@ -498,6 +503,7 @@ async function fetchStock(symbol) {
 }
 
 // Chart
+var POSITION_RISK_THRESHOLD = 25; // % of portfolio value a single position can reach before it's flagged overweight
 var priceChart = null;
 var crosshairPlugin = {
     id: 'crosshair',
@@ -624,7 +630,7 @@ async function renderPortfolio() {
     var prices   = portfolio.map(function(p) { return priceMap[p.symbol] || null; });
 
     var totalInvested = 0, totalCurrent = 0, allPricesLoaded = true;
-    var chartLabels = [], chartValues = [], chartPlPcts = [], chartSectors = [];
+    var chartLabels = [], chartValues = [], chartPlPcts = [], chartSectors = [], chartSymbols = [];
     var html = '';
 
     portfolio.forEach(function(pos, i) {
@@ -642,6 +648,7 @@ async function renderPortfolio() {
             chartValues.push(currentVal);
             chartPlPcts.push(plPct);
             chartSectors.push(pos.sector || '');
+            chartSymbols.push(pos.symbol || '');
         } else {
             allPricesLoaded = false;
             totalCurrent   += invested;
@@ -736,8 +743,12 @@ async function renderPortfolio() {
             var bgGrad = 'linear-gradient(135deg, rgba(' + r + ',' + g + ',' + b + ',0.9), rgba(' + Math.round(r*0.6) + ',' + Math.round(g*0.6) + ',' + Math.round(b*0.6) + ',0.9))';
             var glow   = '0 0 14px rgba(' + glowR + ',' + glowG + ',' + glowB + ',0.35), inset 0 0 20px rgba(' + glowR + ',' + glowG + ',' + glowB + ',0.06)';
             var pctColor = 'rgb(' + glowR + ',' + glowG + ',' + glowB + ')';
-            tmHtml += '<div class="treemap-cell" style="flex-grow:' + Math.max(pct,8).toFixed(1) + ';background:' + bgGrad + ';box-shadow:' + glow + '">'
+            var isOverweight = pct >= POSITION_RISK_THRESHOLD;
+            tmHtml += '<div class="treemap-cell' + (isOverweight ? ' overweight' : '') + '" style="flex-grow:' + Math.max(pct,8).toFixed(1) + ';background:' + bgGrad + ';box-shadow:' + glow + '">'
+                    + (isOverweight ? '<div class="treemap-overweight-tag">overweight</div>' : '')
+                    + '<div class="treemap-tooltip">' + esc(name) + '</div>'
                     + '<div class="treemap-name">' + esc(name) + '</div>'
+                    + '<div class="treemap-sym">' + esc(chartSymbols[i] || '') + '</div>'
                     + '<div class="treemap-pct" style="color:' + pctColor + '">' + sign + plp.toFixed(1) + '%</div>'
                     + '<div class="treemap-val">\u00A5' + formatNum(chartValues[i]) + '</div>'
                     + '</div>';
