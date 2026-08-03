@@ -121,7 +121,7 @@
         .summary-value { font-family: 'Consolas', 'Courier New', monospace; font-weight: bold; font-size: 0.95rem; color: #fff; }
         #allocationChart { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); }
         .treemap-grid { display: flex; flex-wrap: wrap; gap: 5px; }
-        .treemap-cell { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 60px; min-height: 64px; padding: 8px 4px; cursor: default; border-radius: 10px; border: 1px solid rgba(255,255,255,0.09); backdrop-filter: blur(4px); transition: filter 0.2s, transform 0.2s, box-shadow 0.2s; }
+        .treemap-cell { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-basis: 0; min-width: 80px; min-height: 88px; padding: 22px 4px 8px; cursor: default; border-radius: 10px; border: 1px solid rgba(255,255,255,0.09); backdrop-filter: blur(4px); transition: filter 0.2s, transform 0.2s, box-shadow 0.2s; }
         .treemap-cell:hover { filter: brightness(1.25); transform: translateY(-2px); z-index: 5; }
         .treemap-cell.overweight { border: 1px solid rgba(255,60,90,0.6); }
         .treemap-overweight-tag { position: absolute; top: 5px; right: 6px; font-size: 0.58rem; font-weight: bold; color: #ff5c7a; background: rgba(255,60,90,0.15); padding: 1px 6px; border-radius: 6px; box-shadow: 0 0 6px rgba(255,60,90,0.3); white-space: nowrap; }
@@ -744,7 +744,7 @@ async function renderPortfolio() {
             var glow   = '0 0 14px rgba(' + glowR + ',' + glowG + ',' + glowB + ',0.35), inset 0 0 20px rgba(' + glowR + ',' + glowG + ',' + glowB + ',0.06)';
             var pctColor = 'rgb(' + glowR + ',' + glowG + ',' + glowB + ')';
             var isOverweight = pct >= POSITION_RISK_THRESHOLD;
-            tmHtml += '<div class="treemap-cell' + (isOverweight ? ' overweight' : '') + '" style="flex-grow:' + Math.max(pct,8).toFixed(1) + ';background:' + bgGrad + ';box-shadow:' + glow + '">'
+            tmHtml += '<div class="treemap-cell' + (isOverweight ? ' overweight' : '') + '" style="flex-grow:' + Math.max(pct,2).toFixed(1) + ';background:' + bgGrad + ';box-shadow:' + glow + '">'
                     + '<div class="treemap-weight-tag">' + pct.toFixed(1) + '%</div>'
                     + (isOverweight ? '<div class="treemap-overweight-tag">overweight</div>' : '')
                     + '<div class="treemap-tooltip">' + esc(name) + '</div>'
