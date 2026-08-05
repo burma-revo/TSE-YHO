@@ -92,14 +92,16 @@
         .tag-swing { background: rgba(255,179,71,0.12); color: #ffb347; box-shadow: 0 0 6px rgba(255,179,71,0.15); }
         .tag-dividend { background: rgba(120,180,255,0.12); color: #78b4ff; box-shadow: 0 0 6px rgba(120,180,255,0.15); }
         .tag-speculative { background: rgba(255,92,122,0.12); color: #ff5c7a; box-shadow: 0 0 6px rgba(255,92,122,0.15); }
-        .concentration-banner { background: rgba(255,179,71,0.06); border: 1px solid rgba(255,179,71,0.35); border-radius: 14px; padding: 16px 18px; margin-top: 12px; box-shadow: 0 0 20px rgba(255,179,71,0.08); display: none; }
+        .concentration-banner { background: rgba(255,255,255,0.03); border: 1px solid rgba(0,255,220,0.2); border-radius: 14px; padding: 16px 18px; margin-top: 12px; box-shadow: 0 0 20px rgba(0,255,220,0.06); display: none; }
         .concentration-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .concentration-title { font-weight: bold; color: #fff; font-size: 0.92rem; }
-        .concentration-pct { font-family: 'Consolas', 'Courier New', monospace; font-weight: bold; color: #ffb347; }
-        .concentration-track { position: relative; height: 10px; border-radius: 6px; background: rgba(255,255,255,0.06); margin-bottom: 8px; }
-        .concentration-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #ffb347, #ff7b47); box-shadow: 0 0 10px rgba(255,179,71,0.5); transition: width 0.4s; }
-        .concentration-threshold { position: absolute; top: -4px; width: 2px; height: 18px; background: rgba(255,255,255,0.4); }
-        .concentration-note { font-size: 0.7rem; color: #8fa9a4; }
+        .concentration-count { font-size: 0.7rem; color: #8fa9a4; }
+        .concentration-track { display: flex; height: 20px; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+        .concentration-seg { height: 100%; transition: width 0.4s; }
+        .concentration-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+        .concentration-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.68rem; color: #dff7f2; font-family: 'Consolas', 'Courier New', monospace; }
+        .concentration-swatch { width: 8px; height: 8px; border-radius: 2px; }
+        .concentration-legend-pct { font-weight: bold; }
         .portfolio-position { text-align: right; font-size: 0.85rem; color: #8fd4d1; white-space: nowrap; font-family: 'Consolas', 'Courier New', monospace; }
         .portfolio-current { text-align: right; font-size: 0.85rem; color: #fff; white-space: nowrap; font-family: 'Consolas', 'Courier New', monospace; }
         .portfolio-current .current-label { color: #456a68; font-size: 0.75rem; font-family: 'Segoe UI', sans-serif; }
@@ -761,10 +763,10 @@ async function renderPortfolio() {
     loadRealizedPl();
 }
 
-// Warns if the portfolio is heavily concentrated in one sector. Uses the
-// sector already stored per-position (fetched at add-time / via "Refresh
-// sectors") rather than a live lookup, so this is just a client-side pass
-// over data we already have.
+// Sector allocation bar. Uses the sector already stored per-position
+// (fetched at add-time / via "Refresh sectors") rather than a live lookup,
+// so this is just a client-side pass over data we already have.
+var SECTOR_COLORS = ['#ff5c7a', '#ffb347', '#00ffdd', '#7f7bff', '#00ffb0', '#ff8bd0', '#5cb8ff', '#c9ff5c'];
 function renderSectorConcentration(sectors, values, totalVal) {
     var bannerEl = document.getElementById('concentrationBanner');
     if (!bannerEl) return;
@@ -772,33 +774,36 @@ function renderSectorConcentration(sectors, values, totalVal) {
 
     var bySector = {};
     sectors.forEach(function(sector, i) {
-        if (!sector) return; // skip positions with unknown sector
-        bySector[sector] = (bySector[sector] || 0) + values[i];
+        var key = sector || 'Unknown';
+        bySector[key] = (bySector[key] || 0) + values[i];
     });
 
-    var top = null;
-    Object.keys(bySector).forEach(function(sector) {
-        if (!top || bySector[sector] > bySector[top]) top = sector;
-    });
-    if (!top) { bannerEl.style.display = 'none'; return; }
+    var entries = Object.keys(bySector).map(function(sector) {
+        return { sector: sector, value: bySector[sector], pct: (bySector[sector] / totalVal) * 100 };
+    }).sort(function(a, b) { return b.value - a.value; });
+    if (!entries.length) { bannerEl.style.display = 'none'; return; }
 
-    var pct = (bySector[top] / totalVal) * 100;
-    if (pct >= 40) {
-        bannerEl.style.display = 'block';
-        var fillPct = Math.min(pct, 100).toFixed(1);
-        bannerEl.innerHTML =
-            '<div class="concentration-head">'
-          +   '<span class="concentration-title">&#9888; Concentration risk: ' + esc(top) + '</span>'
-          +   '<span class="concentration-pct">' + pct.toFixed(0) + '%</span>'
-          + '</div>'
-          + '<div class="concentration-track">'
-          +   '<div class="concentration-fill" style="width:' + fillPct + '%"></div>'
-          +   '<div class="concentration-threshold" style="left:40%"></div>'
-          + '</div>'
-          + '<div class="concentration-note">Safe threshold marked at 40% &middot; consider trimming or diversifying</div>';
-    } else {
-        bannerEl.style.display = 'none';
-    }
+    bannerEl.style.display = 'block';
+    var segHtml = entries.map(function(e, i) {
+        var color = i < SECTOR_COLORS.length ? SECTOR_COLORS[i] : 'rgba(255,255,255,0.25)';
+        return '<div class="concentration-seg" style="width:' + e.pct.toFixed(2) + '%;background:' + color + '"></div>';
+    }).join('');
+    var legendHtml = entries.map(function(e, i) {
+        var color = i < SECTOR_COLORS.length ? SECTOR_COLORS[i] : 'rgba(255,255,255,0.6)';
+        return '<div class="concentration-legend-item">'
+             +   '<span class="concentration-swatch" style="background:' + color + ';box-shadow:0 0 6px ' + color + '"></span>'
+             +   esc(e.sector)
+             +   '<span class="concentration-legend-pct" style="color:' + color + '">' + e.pct.toFixed(1) + '%</span>'
+             + '</div>';
+    }).join('');
+
+    bannerEl.innerHTML =
+        '<div class="concentration-head">'
+      +   '<span class="concentration-title">Sector allocation</span>'
+      +   '<span class="concentration-count">' + entries.length + (entries.length === 1 ? ' sector' : ' sectors') + '</span>'
+      + '</div>'
+      + '<div class="concentration-track">' + segHtml + '</div>'
+      + '<div class="concentration-legend">' + legendHtml + '</div>';
 }
 
 async function loadRealizedPl() {
