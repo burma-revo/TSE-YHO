@@ -50,10 +50,6 @@
         .pl-positive { color: #00ffb0; text-shadow: 0 0 6px rgba(0,255,176,0.3); }
         .pl-negative { color: #ff5c7a; text-shadow: 0 0 6px rgba(255,60,90,0.3); }
         .pl-zero { color: #7fb8b6; }
-        .pl-bar-wrap { width: 90px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 3px; }
-        .pl-bar-inner { height: 4px; border-radius: 2px; min-width: 2px; }
-        .bar-pos { background: #00ffb0; box-shadow: 0 0 6px rgba(0,255,176,0.5); }
-        .bar-neg { background: #ff5c7a; box-shadow: 0 0 6px rgba(255,60,90,0.5); }
         .summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); }
         .sum-label { color: #456a68; font-size: 0.72rem; margin-bottom: 4px; }
         .sum-value { font-family: 'Consolas', 'Courier New', monospace; font-weight: bold; font-size: 0.95rem; color: #fff; margin-bottom: 5px; }
@@ -74,12 +70,35 @@
         .combined-item { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px 14px; text-align: center; }
         .combined-item.highlight { border-color: rgba(0,255,220,0.4); box-shadow: 0 0 14px rgba(0,255,220,0.1); }
         .combined-item .sum-value { font-size: 1.2rem; margin-bottom: 0; }
+        .stock-sym.clickable { cursor: pointer; text-decoration: underline; text-decoration-color: rgba(90,217,201,0.4); }
+        .stock-sym.clickable:hover { color: #00ffdd; text-decoration-color: #00ffdd; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; padding: 20px; backdrop-filter: blur(3px); }
+        .modal-overlay.active { display: flex; }
+        .symbol-modal { background: rgba(10,20,25,0.92); border: 1px solid rgba(0,255,220,0.25); border-radius: 14px; padding: 22px 26px; width: 100%; max-width: 420px; backdrop-filter: blur(8px); box-shadow: 0 0 30px rgba(0,255,220,0.1); }
+        .symbol-modal-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; }
+        .symbol-modal-name { font-size: 1.15rem; color: #fff; }
+        .symbol-modal-sym { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.75rem; color: #456a68; }
+        .symbol-modal-close { color: #456a68; font-size: 1.3rem; cursor: pointer; line-height: 1; }
+        .symbol-modal-close:hover { color: #00ffdd; }
+        .symbol-modal-stats { display: flex; gap: 28px; margin-bottom: 20px; font-family: 'Consolas', 'Courier New', monospace; }
+        .symbol-modal-stats .sum-label { font-size: 0.65rem; }
+        .symbol-modal-stats .sum-value { font-size: 1.25rem; }
+        .symbol-chart-label { font-size: 0.68rem; color: #456a68; margin-bottom: 8px; }
+        .symbol-chart-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
+        .symbol-chart-scroll::-webkit-scrollbar { height: 6px; }
+        .symbol-chart-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
+        .symbol-chart-scroll::-webkit-scrollbar-thumb { background: rgba(0,255,220,0.3); border-radius: 3px; }
+        .symbol-chart-inner { display: flex; align-items: flex-end; gap: 10px; height: 110px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .symbol-chart-bar-wrap { flex: 0 0 44px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; position: relative; }
+        .symbol-chart-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 3px; }
+        .symbol-chart-bar.neg { border-radius: 0 0 4px 4px; }
+        .symbol-chart-labels { display: flex; gap: 10px; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.62rem; color: #456a68; margin-top: 6px; }
+        .symbol-chart-labels span { flex: 0 0 44px; text-align: center; }
         @media (max-width: 600px) {
             .summary { grid-template-columns: repeat(2,1fr); }
             .combined-grid { grid-template-columns: 1fr; }
             .sale-row { grid-template-columns: 1fr; }
             .row-right { align-items: flex-start; flex-direction: row; flex-wrap: wrap; gap: 8px; }
-            .pl-bar-wrap { display: none; }
         }
     </style>
 </head>
@@ -126,6 +145,28 @@
     </div>
 
 </div>
+
+<div class="modal-overlay" id="symbolModal" onclick="if(event.target===this) closeSymbolModal();">
+    <div class="symbol-modal">
+        <div class="symbol-modal-head">
+            <div>
+                <div class="symbol-modal-name" id="symbolModalName"></div>
+                <div class="symbol-modal-sym" id="symbolModalSym"></div>
+            </div>
+            <span class="symbol-modal-close" onclick="closeSymbolModal()">&times;</span>
+        </div>
+        <div class="symbol-modal-stats">
+            <div><div class="sum-label">Realized</div><div class="sum-value" id="symbolModalRealized">--</div></div>
+            <div><div class="sum-label">Win rate</div><div class="sum-value" id="symbolModalWinRate">--</div></div>
+            <div><div class="sum-label">Avg hold</div><div class="sum-value" id="symbolModalAvgHold">--</div></div>
+        </div>
+        <div class="symbol-chart-label">P&amp;L per trade</div>
+        <div class="symbol-chart-scroll">
+            <div id="symbolChartArea"></div>
+        </div>
+    </div>
+</div>
+
 <script>
 function gasRun(fnName) {
     var args = Array.prototype.slice.call(arguments, 1);
@@ -220,34 +261,31 @@ function render() {
         document.getElementById('summary').style.display = 'none';
         return;
     }
-    var maxProfit = Math.max.apply(null, sales.map(function(s) { return Math.abs(Number(s.profit)||0); }));
     var html = '';
-    var totalProfit = 0, wins = 0;
+    var totalProfit = 0, wins = 0, losses = 0;
     sales.slice().reverse().forEach(function(s) {
         var profit   = Number(s.profit)||0;
         var invested = Number(s.buyPrice)*Number(s.shares);
         var plPct    = invested > 0 ? (profit/invested)*100 : 0;
         var plClass  = profit > 0 ? 'pl-positive' : profit < 0 ? 'pl-negative' : 'pl-zero';
         var plSign   = profit >= 0 ? '+' : '';
-        var barPct   = maxProfit > 0 ? Math.round((Math.abs(profit)/maxProfit)*100) : 0;
-        var barClass = profit >= 0 ? 'bar-pos' : 'bar-neg';
         totalProfit  += profit;
         if (profit > 0) wins++;
+        else if (profit < 0) losses++;
         var buyFmt  = s.buyDate  ? fmtDate(s.buyDate)  : '';
         var sellFmt = s.sellDate ? fmtDate(s.sellDate) : '';
         html += '<div class="sale-row">'
               + '<div class="row-left">'
-              +   '<div class="row-top"><div class="stock-name">' + esc(s.name||s.symbol) + '</div><div class="stock-sym">' + esc(s.symbol) + '</div></div>'
+              +   '<div class="row-top"><div class="stock-name">' + esc(s.name||s.symbol) + '</div><div class="stock-sym clickable" onclick="openSymbolModal(\'' + esc(s.symbol).replace(/'/g,"\\'") + '\')">' + esc(s.symbol) + '</div></div>'
               +   '<div class="row-bottom">'
               +     '<div class="meta-pill">' + s.shares + ' shares</div>'
-              +     '<div class="meta-pill"><span class="meta-hl">-' + fmt(s.buyPrice) + '</span><span class="price-arrow">&#8594;</span><span class="meta-hl">-' + fmt(s.sellPrice) + '</span></div>'
+              +     '<div class="meta-pill"><span class="meta-hl">' + fmt(s.buyPrice) + '</span><span class="price-arrow">&#8594;</span><span class="meta-hl">' + fmt(s.sellPrice) + '</span></div>'
               +     (buyFmt&&sellFmt ? '<div class="meta-pill">' + buyFmt + ' to ' + sellFmt + '</div>' : '')
               +   '</div>'
               + '</div>'
               + '<div class="row-right">'
-              +   '<div class="pl-amount ' + plClass + '">' + plSign + '-' + fmt(Math.abs(profit)) + '</div>'
+              +   '<div class="pl-amount ' + plClass + '">' + plSign + fmt(Math.abs(profit)) + '</div>'
               +   '<div class="pl-pct-text ' + plClass + '">(' + plSign + plPct.toFixed(1) + '%)</div>'
-              +   '<div class="pl-bar-wrap"><div class="pl-bar-inner ' + barClass + '" style="width:' + barPct + '%"></div></div>'
               + '</div>'
               + '</div>';
     });
@@ -255,7 +293,7 @@ function render() {
 
     var totalClass = totalProfit > 0 ? 'pl-positive' : totalProfit < 0 ? 'pl-negative' : 'pl-zero';
     var totalSign  = totalProfit >= 0 ? '+' : '';
-    var winRate    = sales.length > 0 ? Math.round((wins/sales.length)*100) : 0;
+    var winRate    = (wins + losses) > 0 ? Math.round((wins/(wins+losses))*100) : 0;
 
     // Trend caption: compare this year's realized total to the prior year's,
     // only meaningful when a specific year is selected (not "all").
@@ -278,7 +316,8 @@ function render() {
     // that have both dates.
     var holdDurations = sales
         .filter(function(s) { return s.buyDate && s.sellDate; })
-        .map(function(s) { return (new Date(s.sellDate+'T00:00:00') - new Date(s.buyDate+'T00:00:00')) / 86400000; });
+        .map(function(s) { return (new Date(s.sellDate+'T00:00:00') - new Date(s.buyDate+'T00:00:00')) / 86400000; })
+        .filter(function(d) { return !isNaN(d); });
     var avgHoldDays = holdDurations.length > 0
         ? Math.round(holdDurations.reduce(function(a,b){return a+b;},0) / holdDurations.length)
         : null;
@@ -294,7 +333,7 @@ function render() {
     var summaryEl = document.getElementById('summary');
     summaryEl.style.display = 'grid';
     summaryEl.innerHTML =
-        '<div><div class="sum-label">Realized P&L</div><div class="hero-value ' + totalClass + '">' + totalSign + '-' + fmt(Math.abs(totalProfit)) + '</div><div class="hero-sub">' + sales.length + ' sale' + (sales.length===1?'':'s') + '</div>' + trendHtml + '</div>'
+        '<div><div class="sum-label">Realized P&L</div><div class="hero-value ' + totalClass + '">' + totalSign + fmt(Math.abs(totalProfit)) + '</div><div class="hero-sub">' + sales.length + ' sale' + (sales.length===1?'':'s') + '</div>' + trendHtml + '</div>'
       + '<div><div class="sum-label">Avg Holding Period</div><div class="sum-value">' + (avgHoldDays != null ? avgHoldDays + 'd' : '--') + '</div></div>'
       + '<div><div class="sum-label">Profit Factor</div><div class="sum-value">' + profitFactorText + '</div></div>'
       + '<div><div class="sum-label">Win rate</div><div class="sum-value">' + winRate + '%</div><div class="stacked-bar"><div class="stacked-win" style="flex:' + winRate + '"></div><div class="stacked-loss" style="flex:' + (100-winRate) + '"></div></div></div>';
@@ -359,7 +398,7 @@ function renderMonthlyChart() {
                     var sign = p >= 0 ? '+' : '';
                     var cls  = p >= 0 ? 'hover-up' : 'hover-down';
                     if (p === 0) { hoverInfo.innerHTML = '<span style="color:#7fb8b6">' + labels[idx] + '</span> <span style="color:#7fb8b6">no sales</span>'; return; }
-                    hoverInfo.innerHTML = '<span style="color:#7fb8b6">' + labels[idx] + '</span> <span class="' + cls + '">' + sign + '-' + fmtAbs(p) + '</span>';
+                    hoverInfo.innerHTML = '<span style="color:#7fb8b6">' + labels[idx] + '</span> <span class="' + cls + '">' + sign + fmtAbs(p) + '</span>';
                 } else { hoverInfo.innerHTML = ' '; }
             },
             plugins: { legend: { display: false }, tooltip: { enabled: false } },
@@ -390,6 +429,66 @@ function exportCSV() {
     a.href = URL.createObjectURL(blob);
     a.download = 'tse-sales-history.csv';
     a.click();
+}
+
+// Per-symbol popup: aggregates ALL of that symbol's closed trades (all-time,
+// not scoped to the current year filter) so it reflects the full track record.
+function openSymbolModal(symbol) {
+    var trades = allSales.filter(function(s) { return s.symbol === symbol; });
+    if (!trades.length) return;
+    var name = trades[trades.length - 1].name || symbol;
+
+    document.getElementById('symbolModalName').textContent = name;
+    document.getElementById('symbolModalSym').textContent = symbol;
+
+    var totalProfit = trades.reduce(function(sum, s) { return sum + (Number(s.profit)||0); }, 0);
+    var wins = trades.filter(function(s) { return (Number(s.profit)||0) > 0; }).length;
+    var losses = trades.filter(function(s) { return (Number(s.profit)||0) < 0; }).length;
+    var winRate = (wins + losses) > 0 ? Math.round((wins/(wins+losses))*100) : null;
+
+    var holdDurations = trades
+        .filter(function(s) { return s.buyDate && s.sellDate; })
+        .map(function(s) { return (new Date(s.sellDate+'T00:00:00') - new Date(s.buyDate+'T00:00:00')) / 86400000; })
+        .filter(function(d) { return !isNaN(d); });
+    var avgHoldDays = holdDurations.length > 0
+        ? Math.round(holdDurations.reduce(function(a,b){return a+b;},0) / holdDurations.length)
+        : null;
+
+    var realizedEl = document.getElementById('symbolModalRealized');
+    realizedEl.className = 'sum-value ' + (totalProfit > 0 ? 'pl-positive' : totalProfit < 0 ? 'pl-negative' : 'pl-zero');
+    realizedEl.textContent = (totalProfit >= 0 ? '+' : '-') + '¥' + fmt(Math.abs(totalProfit));
+    document.getElementById('symbolModalWinRate').textContent = winRate != null ? winRate + '%' : '--';
+    document.getElementById('symbolModalAvgHold').textContent = avgHoldDays != null ? avgHoldDays + 'd' : '--';
+
+    renderSymbolChart(trades);
+    document.getElementById('symbolModal').classList.add('active');
+}
+
+function closeSymbolModal() {
+    document.getElementById('symbolModal').classList.remove('active');
+}
+
+function renderSymbolChart(trades) {
+    var sorted = trades.slice().sort(function(a, b) {
+        return (a.sellDate||'').localeCompare(b.sellDate||'');
+    });
+    var maxAbs = Math.max.apply(null, sorted.map(function(s) { return Math.abs(Number(s.profit)||0); })) || 1;
+
+    var barsHtml = '', labelsHtml = '';
+    sorted.forEach(function(s) {
+        var profit = Number(s.profit)||0;
+        var heightPct = Math.max(Math.round((Math.abs(profit)/maxAbs)*100), 3);
+        var color = profit >= 0 ? '#00ffb0' : '#ff5c7a';
+        var glow = profit >= 0 ? 'rgba(0,255,176,0.35)' : 'rgba(255,60,90,0.35)';
+        barsHtml += '<div class="symbol-chart-bar-wrap" title="' + esc(s.sellDate ? fmtDate(s.sellDate) : '') + ': ' + (profit>=0?'+':'-') + '¥' + fmt(Math.abs(profit)) + '">'
+                  +   '<div class="symbol-chart-bar' + (profit < 0 ? ' neg' : '') + '" style="height:' + heightPct + '%;background:' + color + ';box-shadow:0 0 8px ' + glow + ';"></div>'
+                  + '</div>';
+        labelsHtml += '<span>' + (s.sellDate ? fmtDate(s.sellDate) : '--') + '</span>';
+    });
+
+    document.getElementById('symbolChartArea').innerHTML =
+        '<div class="symbol-chart-inner">' + barsHtml + '</div>'
+      + '<div class="symbol-chart-labels">' + labelsHtml + '</div>';
 }
 
 function fmt(n) { if (n==null||isNaN(n)) return 'N/A'; return Number(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
