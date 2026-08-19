@@ -197,6 +197,56 @@ function fetchAllPrices(symbols) {
 }
 
 
+// ─── Client-callable: fetch 52-week high/low for symbols ──────
+// Uses the same chart endpoint as fetchAllPrices (meta already includes
+// fiftyTwoWeekHigh/Low), so no quoteSummary session/crumb needed.
+
+function fetchAll52WeekRanges(symbols) {
+  if (!symbols || symbols.length === 0) return {};
+
+  var cache = CacheService.getScriptCache();
+  var results = {};
+  var toFetch = [];
+
+  symbols.forEach(function(sym) {
+    var cached = cache.get("yf_range_" + sym);
+    if (cached) {
+      try { results[sym] = JSON.parse(cached); } catch(e) {}
+    } else {
+      toFetch.push(sym);
+    }
+  });
+
+  if (toFetch.length > 0) {
+    var requests = toFetch.map(function(sym) {
+      return {
+        url: "https://query1.finance.yahoo.com/v8/finance/chart/" + sym + "?interval=1d&range=1d",
+        headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" },
+        muteHttpExceptions: true
+      };
+    });
+
+    var responses = UrlFetchApp.fetchAll(requests);
+    responses.forEach(function(res, i) {
+      var sym = toFetch[i];
+      try {
+        if (res.getResponseCode() === 200) {
+          var data = JSON.parse(res.getContentText());
+          var meta = data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta;
+          if (meta && meta.fiftyTwoWeekHigh && meta.fiftyTwoWeekLow) {
+            var range = { low: meta.fiftyTwoWeekLow, high: meta.fiftyTwoWeekHigh };
+            results[sym] = range;
+            try { cache.put("yf_range_" + sym, JSON.stringify(range), TTL_PRICE); } catch(e) {}
+          }
+        }
+      } catch(e) {}
+    });
+  }
+
+  return results;
+}
+
+
 // ─── Sheet helpers ────────────────────────────────────────────
 
 // Column layout: symbol, name, buyPrice, buyDate, shares, notes, buyCount, sector, id, tag

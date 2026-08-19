@@ -35,6 +35,14 @@
         .w-sym { color: #456a68; font-size: 0.75rem; }
         .sector-badge { font-size: 0.68rem; background: rgba(127,123,255,0.12); border: 1px solid rgba(127,123,255,0.3); color: #c9c4ff; padding: 2px 8px; border-radius: 10px; }
         .w-meta { font-size: 0.75rem; color: #7fb8b6; }
+        .sector-filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+        .sector-chip { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; color: #7fb8b6; cursor: pointer; padding: 4px 12px; font-size: 0.78rem; transition: all 0.2s; }
+        .sector-chip:hover { border-color: #00ffdd; color: #00ffdd; }
+        .sector-chip.active { background: linear-gradient(90deg, #00ffdd, #00c9a8); border-color: transparent; color: #04342c; font-weight: bold; box-shadow: 0 0 10px rgba(0,255,220,0.25); }
+        .w-range { margin-top: 8px; }
+        .w-range-track { position: relative; height: 6px; border-radius: 3px; background: linear-gradient(90deg, rgba(255,60,90,0.3), rgba(255,255,255,0.08), rgba(0,255,176,0.3)); margin-bottom: 4px; }
+        .w-range-marker { position: absolute; top: -3px; width: 2px; height: 12px; background: #00ffdd; box-shadow: 0 0 6px rgba(0,255,220,0.6); }
+        .w-range-labels { display: flex; justify-content: space-between; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.62rem; color: #456a68; }
         .w-current { text-align: right; }
         .now-label { color: #456a68; font-size: 0.72rem; }
         .now-price { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.9rem; font-weight: bold; color: #fff; }
@@ -86,6 +94,7 @@
             <div class="card-title">Watching</div>
             <button class="add-btn" onclick="openAddModal()">+ Add stock</button>
         </div>
+        <div class="sector-filter-row" id="sectorFilterRow"></div>
         <div class="rows" id="watchRows"><div class="empty">Loading...</div></div>
     </div>
 </div>
@@ -145,6 +154,7 @@ var watchlist = [];
 var buyIndex = -1;
 var watchChart = null;
 var fullHistory = [];
+var currentSector = 'all';
 
 async function init() {
     try {
@@ -156,19 +166,63 @@ async function init() {
     }
 }
 
+function renderSectorFilterRow() {
+    var counts = {};
+    watchlist.forEach(function(w) {
+        var s = w.sector || 'Unknown';
+        counts[s] = (counts[s] || 0) + 1;
+    });
+    var sectors = Object.keys(counts).sort();
+    var row = document.getElementById('sectorFilterRow');
+    if (sectors.length <= 1) { row.innerHTML = ''; return; }
+
+    var html = '<button class="sector-chip' + (currentSector==='all' ? ' active' : '') + '" data-sector="all">All (' + watchlist.length + ')</button>';
+    sectors.forEach(function(s) {
+        html += '<button class="sector-chip' + (currentSector===s ? ' active' : '') + '" data-sector="' + esc(s) + '">' + esc(s) + ' (' + counts[s] + ')</button>';
+    });
+    row.innerHTML = html;
+    row.querySelectorAll('[data-sector]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            currentSector = btn.getAttribute('data-sector');
+            renderSectorFilterRow();
+            renderWatchRowsList();
+        });
+    });
+}
+
+var priceMap = {}, rangeMap = {};
+
 async function renderWatchRows() {
     var el = document.getElementById('watchRows');
     if (watchlist.length === 0) {
+        document.getElementById('sectorFilterRow').innerHTML = '';
         el.innerHTML = '<div class="empty">No stocks on your watchlist yet. Click "+ Add stock".</div>';
         return;
     }
     el.innerHTML = '<div class="empty">Loading live prices...</div>';
 
     var symbols = watchlist.map(function(w) { return w.symbol; });
-    var priceMap = await gasRun('fetchAllPrices', symbols);
+    priceMap = await gasRun('fetchAllPrices', symbols);
+    rangeMap = await gasRun('fetchAll52WeekRanges', symbols);
+
+    renderSectorFilterRow();
+    renderWatchRowsList();
+}
+
+function renderWatchRowsList() {
+    var el = document.getElementById('watchRows');
+    var visible = watchlist
+        .map(function(w, i) { return { w: w, i: i }; })
+        .filter(function(entry) { return currentSector === 'all' || (entry.w.sector || 'Unknown') === currentSector; });
+
+    if (visible.length === 0) {
+        el.innerHTML = '<div class="empty">No stocks in this sector.</div>';
+        return;
+    }
 
     var html = '';
-    watchlist.forEach(function(w, i) {
+    visible.forEach(function(entry) {
+        var w = entry.w, i = entry.i;
         var price = priceMap[w.symbol];
         var change = null, changeClass = 'pl-zero';
         if (price != null && w.noticePrice > 0) {
@@ -176,10 +230,22 @@ async function renderWatchRows() {
             changeClass = change > 0 ? 'pl-positive' : change < 0 ? 'pl-negative' : 'pl-zero';
         }
         var sectorHtml = w.sector ? '<span class="sector-badge">' + esc(w.sector) + '</span>' : '';
+
+        var rangeHtml = '';
+        var range = rangeMap[w.symbol];
+        if (range && price != null && range.high > range.low) {
+            var pct = Math.min(100, Math.max(0, ((price - range.low) / (range.high - range.low)) * 100));
+            rangeHtml = '<div class="w-range">'
+                      +   '<div class="w-range-track"><div class="w-range-marker" style="left:' + pct.toFixed(1) + '%"></div></div>'
+                      +   '<div class="w-range-labels"><span>52w low \u00A5' + fmt(range.low) + '</span><span>52w high \u00A5' + fmt(range.high) + '</span></div>'
+                      + '</div>';
+        }
+
         html += '<div class="w-row">'
               + '<div class="w-left">'
               +   '<div class="w-top"><div class="w-name">' + esc(w.name || w.symbol) + '</div><div class="w-sym">' + esc(w.symbol) + '</div>' + sectorHtml + '</div>'
               +   '<div class="w-meta">Noticed at \u00A5' + fmt(w.noticePrice) + ' on ' + fmtDate(w.noticeDate) + '</div>'
+              +   rangeHtml
               + '</div>'
               + '<div class="w-current">'
               +   '<div class="now-label">Now</div>'
