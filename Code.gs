@@ -19,14 +19,15 @@ function doGet(e) {
   // Serve HTML pages
   if (!action) {
     var page   = (e && e.parameter && e.parameter.page) || "portfolio";
-    var valid  = ["portfolio", "growth", "history", "watchlist", "calendar"];
+    var valid  = ["portfolio", "growth", "history", "watchlist", "calendar", "reentry"];
     if (valid.indexOf(page) === -1) page = "portfolio";
     var titles = {
       portfolio: "TSE Tracker",
       growth: "TSE Tracker - Growth",
       history: "TSE Tracker - History",
       watchlist: "TSE Tracker - Watchlist",
-      calendar: "TSE Tracker - Calendar"
+      calendar: "TSE Tracker - Calendar",
+      reentry: "TSE Tracker - Re-entry"
     };
     var file   = page === "portfolio" ? "index" : page;
     return HtmlService
@@ -309,6 +310,54 @@ function getSalesSheet() {
   return sheet;
 }
 
+function getReentrySheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Reentry");
+  if (!sheet) {
+    sheet = ss.insertSheet("Reentry");
+    sheet.appendRow(["symbol","name","sellPrice","sellDate"]);
+  }
+  return sheet;
+}
+
+// Adds or refreshes this symbol's row with its latest sell price/date.
+// Deleting a row from the Reentry sheet is how the user opts a symbol
+// out; it comes back only if that symbol is sold again.
+function upsertReentry(symbol, name, sellPrice, sellDate) {
+  var sheet = getReentrySheet();
+  var lastRow = sheet.getLastRow();
+  var row = -1;
+  if (lastRow > 1) {
+    var symbols = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < symbols.length; i++) {
+      if (symbols[i][0] === symbol) { row = i + 2; break; }
+    }
+  }
+  if (row === -1) {
+    sheet.appendRow([symbol, name, sellPrice, sellDate]);
+  } else {
+    sheet.getRange(row, 1, 1, 4).setValues([[symbol, name, sellPrice, sellDate]]);
+  }
+}
+
+function getAllReentry() {
+  var sheet = getReentrySheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return [];
+  return sheet.getRange(2, 1, lastRow - 1, 4).getValues().map(function(row) {
+    return {
+      symbol:    row[0] || "",
+      name:      row[1] || "",
+      sellPrice: Number(row[2]) || 0,
+      sellDate:  row[3] ? formatDate(row[3]) : ""
+    };
+  });
+}
+
+function getAllReentryFromClient() {
+  return getAllReentry();
+}
+
 
 // ─── Portfolio CRUD ───────────────────────────────────────────
 
@@ -398,6 +447,7 @@ function sellPosition(id, sellData) {
 
   var profit = (sellPrice - buyPrice) * sellShares;
   getSalesSheet().appendRow([symbol, name, buyPrice, sellPrice, sellShares, buyDate, sellDate, profit]);
+  upsertReentry(symbol, name, sellPrice, sellDate);
 
   var remaining = currentShares - sellShares;
   if (remaining <= 0) {

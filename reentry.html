@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSE Tracker - Re-entry</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #050b14; color: #e0e0e0; min-height: 100vh; padding: 20px; position: relative; }
+        body::before, body::after { content: ''; position: fixed; width: 280px; height: 280px; border-radius: 50%; z-index: -1; pointer-events: none; }
+        body::before { top: -100px; right: -100px; background: radial-gradient(circle, rgba(0,255,220,0.10), transparent 70%); }
+        body::after { bottom: -100px; left: -100px; background: radial-gradient(circle, rgba(120,80,255,0.08), transparent 70%); }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 4px; font-size: 1.8rem; letter-spacing: 1px; background: linear-gradient(90deg, #00ffdd, #7f7bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .subtitle { text-align: center; color: #5ad9c9; margin-bottom: 24px; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; }
+        .nav-links { display: flex; justify-content: center; gap: 10px; margin-bottom: 28px; flex-wrap: wrap; }
+        .nav-link { color: #7fb8b6; font-size: 0.85rem; border: 1px solid rgba(223,247,242,0.12); padding: 5px 14px; border-radius: 20px; transition: all 0.2s; background: none; cursor: pointer; }
+        .nav-link:hover { border-color: #00ffdd; color: #00ffdd; }
+        .nav-link.active { border-color: rgba(0,255,220,0.5); color: #00ffdd; background: rgba(0,255,220,0.08); box-shadow: 0 0 10px rgba(0,255,220,0.25); }
+        .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(0,255,220,0.2); border-radius: 14px; padding: 20px; margin-bottom: 20px; backdrop-filter: blur(6px); box-shadow: 0 0 24px rgba(0,255,220,0.05); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 8px; }
+        .card-title { font-size: 1.1rem; font-weight: bold; color: #00ffdd; text-shadow: 0 0 8px rgba(0,255,220,0.3); }
+        .card-hint { font-size: 0.75rem; color: #456a68; margin-bottom: 16px; }
+        .rows { max-height: 520px; overflow-y: auto; }
+        .rows::-webkit-scrollbar { width: 6px; }
+        .rows::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
+        .rows::-webkit-scrollbar-thumb { background: rgba(0,255,220,0.3); border-radius: 3px; }
+        .r-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 12px 14px; background: rgba(0,0,0,0.25); border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 8px; align-items: center; transition: border-color 0.2s, box-shadow 0.2s; }
+        .r-row:hover { border-color: rgba(0,255,220,0.3); box-shadow: 0 0 10px rgba(0,255,220,0.08); }
+        .r-row.held { opacity: 0.55; }
+        .r-left { min-width: 0; }
+        .r-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+        .r-name { font-weight: bold; color: #fff; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+        .r-sym { color: #456a68; font-size: 0.75rem; }
+        .r-meta { font-size: 0.75rem; color: #7fb8b6; }
+        .r-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+        .r-badge { font-size: 0.66rem; padding: 2px 8px; border-radius: 10px; }
+        .r-badge.held { background: rgba(127,123,255,0.15); border: 1px solid rgba(127,123,255,0.5); color: #c9c6ff; }
+        .r-badge.low52 { background: rgba(0,255,176,0.1); border: 1px solid rgba(0,255,176,0.4); color: #00ffb0; }
+        .r-current { text-align: right; }
+        .now-label { color: #456a68; font-size: 0.72rem; }
+        .now-price { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.95rem; font-weight: bold; color: #fff; }
+        .change-pct { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.8rem; font-weight: bold; }
+        .pl-positive { color: #00ffb0; text-shadow: 0 0 6px rgba(0,255,176,0.3); }
+        .pl-negative { color: #ff5c7a; text-shadow: 0 0 6px rgba(255,60,90,0.3); }
+        .pl-zero { color: #7fb8b6; }
+        .empty { color: #456a68; text-align: center; padding: 30px 0; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Tokyo Stock Exchange</h1>
+    <p class="subtitle">Re-entry</p>
+    <div class="nav-links">
+        <button class="nav-link" onclick="navigate('portfolio')">Portfolio</button>
+        <button class="nav-link" onclick="navigate('growth')">Growth</button>
+        <button class="nav-link" onclick="navigate('history')">History</button>
+        <button class="nav-link" onclick="navigate('watchlist')">Watchlist</button>
+        <button class="nav-link" onclick="navigate('calendar')">Calendar</button>
+        <button class="nav-link active" onclick="navigate('reentry')">Re-entry</button>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Sold stocks worth another look</div>
+        </div>
+        <div class="card-hint">Sorted by biggest discount to your last exit price. Delete a row from the Reentry sheet to stop tracking a symbol.</div>
+        <div class="rows" id="reentryRows"><div class="empty">Loading...</div></div>
+    </div>
+</div>
+
+<script>
+function gasRun(fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function(resolve, reject) {
+        var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+        runner[fnName].apply(runner, args);
+    });
+}
+
+async function init() {
+    var el = document.getElementById('reentryRows');
+    try {
+        var entries = await gasRun('getAllReentryFromClient');
+        if (entries.length === 0) {
+            el.innerHTML = '<div class="empty">No sold stocks tracked yet. Selling a position adds it here automatically.</div>';
+            return;
+        }
+
+        var symbols = entries.map(function(e) { return e.symbol; });
+        var priceMapP = gasRun('fetchAllPrices', symbols);
+        var rangeMapP = gasRun('fetchAll52WeekRanges', symbols);
+        var positionsP = gasRun('getAllPositions');
+
+        var priceMap = await priceMapP;
+        var rangeMap = await rangeMapP;
+        var positions = await positionsP;
+        var heldSymbols = {};
+        positions.forEach(function(p) { heldSymbols[p.symbol] = p.shares; });
+
+        var rows = entries.map(function(e) {
+            var price = priceMap[e.symbol];
+            var change = (price != null && e.sellPrice > 0) ? ((price - e.sellPrice) / e.sellPrice) * 100 : null;
+            return { entry: e, price: price, change: change };
+        });
+
+        rows.sort(function(a, b) {
+            if (a.change == null) return 1;
+            if (b.change == null) return -1;
+            return a.change - b.change;
+        });
+
+        var html = '';
+        rows.forEach(function(r) {
+            var e = r.entry;
+            var changeClass = r.change == null ? 'pl-zero' : r.change > 0 ? 'pl-negative' : r.change < 0 ? 'pl-positive' : 'pl-zero';
+            var held = heldSymbols.hasOwnProperty(e.symbol);
+            var range = rangeMap[e.symbol];
+            var near52wLow = range && r.price != null && range.high > range.low && ((r.price - range.low) / (range.high - range.low)) <= 0.1;
+
+            var badges = '';
+            if (held) badges += '<span class="r-badge held">Already in portfolio &middot; holding ' + heldSymbols[e.symbol] + '</span>';
+            if (near52wLow) badges += '<span class="r-badge low52">Near 52w low</span>';
+
+            html += '<div class="r-row' + (held ? ' held' : '') + '">'
+                  + '<div class="r-left">'
+                  +   '<div class="r-top"><div class="r-name">' + esc(e.name || e.symbol) + '</div><div class="r-sym">' + esc(e.symbol) + '</div></div>'
+                  +   '<div class="r-meta">Sold ¥' + fmt(e.sellPrice) + ' on ' + fmtDate(e.sellDate) + '</div>'
+                  +   (badges ? '<div class="r-badges">' + badges + '</div>' : '')
+                  + '</div>'
+                  + '<div class="r-current">'
+                  +   '<div class="now-label">Now</div>'
+                  +   '<div class="now-price">' + (r.price != null ? '¥' + fmt(r.price) : '--') + '</div>'
+                  +   (r.change != null ? '<div class="change-pct ' + changeClass + '">' + (r.change>=0?'+':'') + r.change.toFixed(1) + '% vs exit</div>' : '')
+                  + '</div>'
+                  + '</div>';
+        });
+        el.innerHTML = html;
+    } catch(e) {
+        el.innerHTML = '<div class="empty">Could not load: ' + e.message + '</div>';
+    }
+}
+
+function fmt(n) { if (n==null||isNaN(n)) return 'N/A'; return Number(n).toLocaleString('en-US',{maximumFractionDigits:1}); }
+function esc(s) { var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function fmtDate(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr.indexOf('T')!==-1?dateStr:dateStr+'T00:00:00');
+    if (isNaN(d.getTime())) return String(dateStr);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+
+var _baseUrl = '';
+function initNav() {
+    gasRun('getDeploymentUrl').then(function(url) { _baseUrl = url; }).catch(function() { _baseUrl = ''; });
+}
+function navigate(page) {
+    var url = _baseUrl || window.top.location.href.split('?')[0];
+    window.top.location.href = url + '?page=' + page;
+}
+initNav();
+init();
+</script>
+</body>
+</html>
